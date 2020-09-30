@@ -406,7 +406,20 @@ export default {
 			return envelopes
 		})
 	},
-	syncEnvelopes({ commit, getters, dispatch }, { mailboxId, query, init = false }) {
+	syncEnvelopesByRole({ commit, getters, dispatch }, { role, accountId, query, init = false, criteria = 'all' }) {
+		return Promise.all(getters.getMailboxes(accountId)
+			.filter(mb => mb.specialRole === role)
+			.map(mb =>
+				dispatch('syncEnvelopes', {
+					mailboxId: mb.databaseId,
+					query,
+					init,
+					criteria,
+				})
+			)
+		)
+	},
+	syncEnvelopes({ commit, getters, dispatch }, { mailboxId, query, init = false, criteria = 'all' }) {
 		const mailbox = getters.getMailbox(mailboxId)
 
 		if (mailbox.isUnified) {
@@ -423,6 +436,7 @@ export default {
 										mailboxId: mailbox.databaseId,
 										query,
 										init,
+										criteria,
 									})
 								)
 						)
@@ -442,6 +456,7 @@ export default {
 										mailboxId: mailbox.databaseId,
 										query,
 										init,
+										criteria,
 									})
 								)
 						)
@@ -485,7 +500,12 @@ export default {
 				return matchError(error, {
 					[SyncIncompleteError.getName()]() {
 						console.warn('(initial) sync is incomplete, retriggering')
-						return dispatch('syncEnvelopes', { mailboxId, query, init })
+						return dispatch('syncEnvelopes', {
+							mailboxId,
+							query,
+							init,
+							criteria,
+						 })
 					},
 					[MailboxLockedError.getName()](error) {
 						logger.info('Sync failed because the mailbox is locked, retriggering', { error })

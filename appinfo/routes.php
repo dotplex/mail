@@ -91,8 +91,11 @@ return [
 		],
 		[
 			'name' => 'mailboxes#sync',
-			'url' => '/api/mailboxes/{id}/sync',
-			'verb' => 'POST'
+			'url' => '/api/mailboxes/{id}/sync/{criteria}',
+			'verb' => 'POST',
+			'defaults' => [
+				'criteria' => 'all'
+			]
 		],
 		[
 			'name' => 'mailboxes#clearCache',

@@ -610,6 +610,13 @@ export default {
 				.then((data) => this.send(data))
 				.then(() => logger.info('message sent'))
 				.then(() => (this.state = STATES.FINISHED))
+				.then(setTimeout(() => {
+					this.$store.dispatch('syncEnvelopesByRole', {
+						role: 'sent',
+						accountId: this.selectedAlias.id,
+						criteria: 'new-only',
+					})
+				}, 2000))
 				.catch((error) => {
 					logger.error('could not send message', { error })
 					if (error && error.toString) {
