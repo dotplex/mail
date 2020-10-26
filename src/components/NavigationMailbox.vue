@@ -71,7 +71,12 @@
 				<ActionText v-if="showSaving" icon="icon-loading-small">
 					{{ t('mail', 'Saving') }}
 				</ActionText>
-
+				<ActionButton v-if="!account.isUnified && !mailbox.specialRole"
+					icon="icon-external"
+					:close-after-click="true"
+					@click.prevent="onOpenMoveModal">
+					{{ t('mail', 'Move') }}
+				</ActionButton>
 				<ActionButton
 					v-if="debug && !account.isUnified && mailbox.specialRole !== 'flagged'"
 					icon="icon-settings"
@@ -105,7 +110,10 @@
 		<AppNavigationCounter v-if="mailbox.unread" slot="counter">
 			{{ mailbox.unread }}
 		</AppNavigationCounter>
-
+		<MoveModal v-if="showMoveModal"
+			:account="account"
+			:envelopes="[]"
+			@close="onCloseMoveModal" />
 		<!-- submailboxes -->
 		<NavigationMailbox
 			v-for="subMailbox in subMailboxes"
@@ -123,6 +131,7 @@ import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
 import ActionCheckbox from '@nextcloud/vue/dist/Components/ActionCheckbox'
 import ActionInput from '@nextcloud/vue/dist/Components/ActionInput'
 import ActionText from '@nextcloud/vue/dist/Components/ActionText'
+import MoveModal from './MoveModal'
 
 import { clearCache } from '../service/MessageService'
 import { getMailboxStatus } from '../service/MailboxService'
@@ -140,6 +149,7 @@ export default {
 		ActionButton,
 		ActionCheckbox,
 		ActionInput,
+		MoveModal,
 	},
 	props: {
 		account: {
@@ -175,6 +185,7 @@ export default {
 			renameLabel: true,
 			renameInput: false,
 			mailboxName: this.mailbox.displayName,
+			showMoveModal: false,
 
 		}
 	},
@@ -423,6 +434,12 @@ export default {
 			this.renameLabel = false
 			this.renameInput = true
 			this.showSaving = false
+		},
+		onOpenMoveModal() {
+			this.showMoveModal = true
+		},
+		onCloseMoveModal() {
+			this.showMoveModal = false
 		},
 	},
 }
