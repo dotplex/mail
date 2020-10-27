@@ -224,6 +224,7 @@
 <script>
 import debounce from 'lodash/fp/debounce'
 import uniqBy from 'lodash/fp/uniqBy'
+import trimStart from 'lodash/fp/trimCharsStart'
 import Autosize from 'vue-autosize'
 import debouncePromise from 'debounce-promise'
 import Actions from '@nextcloud/vue/dist/Components/Actions'
@@ -236,6 +237,7 @@ import Vue from 'vue'
 
 import ComposerAttachments from './ComposerAttachments'
 import { findRecipient } from '../service/AutocompleteService'
+import { forwardAttachment } from '../service/AttachmentService'
 import { detect, html, plain, toHtml, toPlain } from '../util/text'
 import Loading from './Loading'
 import logger from '../logger'
@@ -420,6 +422,7 @@ export default {
 	},
 	mounted() {
 		this.$refs.toLabel.$el.focus()
+
 		// event is triggered when user clicks 'new message' in navigation
 		this.$root.$on('newMessage', () => {
 			this.draftsPromise
@@ -431,6 +434,24 @@ export default {
 					this.reset()
 				})
 		})
+
+		// Add attachments in case of reply/forward
+		if (this.forwardFrom?.attachments !== undefined || this.replyTo?.attachments !== undefined) {
+			const origMsgId = this.forwardFrom?.databaseId ?? this.replyTo.databaseId
+			const atts = this.forwardFrom?.attachments ?? this.replyTo.attachments
+			atts.forEach(att => {
+				forwardAttachment(origMsgId, att.id)
+					.then(({ fileName, id }) => {
+						const attachment = {
+							fileName,
+							displayName: trimStart('/')(fileName),
+							id,
+							isLocal: id !== undefined,
+						}
+						return this.attachments.push(attachment)
+					}, this)
+			})
+		}
 	},
 	beforeDestroy() {
 		this.$root.$off('newMessage')

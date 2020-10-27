@@ -110,6 +110,11 @@ return [
 			'verb' => 'GET'
 		],
 		[
+			'name' => 'messages#forwardAttachment',
+			'url' => '/api/messages/{id}/attachment/{attachmentId}/forward',
+			'verb' => 'GET'
+		],
+		[
 			'name' => 'messages#downloadAttachment',
 			'url' => '/api/messages/{id}/attachment/{attachmentId}',
 			'verb' => 'GET'

@@ -31,6 +31,7 @@ declare(strict_types=1);
 namespace OCA\Mail\Controller;
 
 use Exception;
+use OCA\Mail\Contracts\IAttachmentService;
 use OCA\Mail\Contracts\IMailManager;
 use OCA\Mail\Contracts\IMailSearch;
 use OCA\Mail\Exception\ClientException;
@@ -40,6 +41,7 @@ use OCA\Mail\Http\HtmlResponse;
 use OCA\Mail\Model\IMAPMessage;
 use OCA\Mail\Service\AccountService;
 use OCA\Mail\Service\ItineraryService;
+use OCA\Mail\Service\Attachment\UploadedFile;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -51,6 +53,7 @@ use OCP\Files\Folder;
 use OCP\Files\IMimeTypeDetector;
 use OCP\IL10N;
 use OCP\IRequest;
+use OCP\ITempManager;
 use OCP\IURLGenerator;
 use Psr\Log\LoggerInterface;
 use function array_map;
@@ -59,6 +62,9 @@ class MessagesController extends Controller {
 
 	/** @var AccountService */
 	private $accountService;
+
+	/** @var IAttachmentService */
+	private $attachmentService;
 
 	/** @var IMailManager */
 	private $mailManager;
@@ -83,6 +89,9 @@ class MessagesController extends Controller {
 
 	/** @var IL10N */
 	private $l10n;
+	
+	/** @var ITempManager */
+	private $tempManager;
 
 	/** @var IURLGenerator */
 	private $urlGenerator;
@@ -90,6 +99,7 @@ class MessagesController extends Controller {
 	/**
 	 * @param string $appName
 	 * @param IRequest $request
+	 * @param IAttachmentService $attachmentService
 	 * @param AccountService $accountService
 	 * @param string $UserId
 	 * @param $userFolder
@@ -103,6 +113,8 @@ class MessagesController extends Controller {
 								AccountService $accountService,
 								IMailManager $mailManager,
 								IMailSearch $mailSearch,
+								ITempManager $tempManager,
+								IAttachmentService $attachmentService,
 								ItineraryService $itineraryService,
 								string $UserId,
 								$userFolder,
@@ -113,6 +125,7 @@ class MessagesController extends Controller {
 		parent::__construct($appName, $request);
 
 		$this->accountService = $accountService;
+		$this->attachmentService = $attachmentService;
 		$this->mailManager = $mailManager;
 		$this->mailSearch = $mailSearch;
 		$this->itineraryService = $itineraryService;
@@ -121,6 +134,7 @@ class MessagesController extends Controller {
 		$this->logger = $logger;
 		$this->l10n = $l10n;
 		$this->mimeTypeDetector = $mimeTypeDetector;
+		$this->tempManager = $tempManager;
 		$this->urlGenerator = $urlGenerator;
 		$this->mailManager = $mailManager;
 	}
@@ -388,6 +402,47 @@ class MessagesController extends Controller {
 				'none'
 			);
 		}
+	}
+
+	/**
+	 * @NoAdminRequired
+	 * @NoCSRFRequired
+	 * @TrapError
+	 *
+	 * @param int $id
+	 * @param string $attachmentId
+	 *
+	 * @return Response
+	 *
+	 * @throws ClientException
+	 * @throws ServiceException
+	 *
+	 * Create a copy of attachment $attachmentId from message $id for use in a new message (typically, a forward)
+	 */
+	public function forwardAttachment(int $id, string $attachmentId): Response {
+		// Get attachment
+		try {
+			$message = $this->mailManager->getMessage($this->currentUserId, $id);
+			$mailbox = $this->mailManager->getMailbox($this->currentUserId, $message->getMailboxId());
+			$account = $this->accountService->find($this->currentUserId, $mailbox->getAccountId());
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse([], Http::STATUS_FORBIDDEN);
+		}
+		$folder = $account->getMailbox($mailbox->getName());
+		$attachment = $folder->getAttachment($message->getUid(), $attachmentId);
+
+		// Create temporary file from attachment
+		$tmpPath = $this->tempManager->getTemporaryFile();
+		file_put_contents($tmpPath, $attachment->getContents());
+		$tmpFile['name'] = $attachment->getName() ?? $this->l10n->t('Embedded message %s', [ $attachmentId, ]) . '.eml';
+		$tmpFile['tmp_name'] = $tmpPath;
+		$tmpFile['type'] = $attachment->getType();
+
+		// Attach temporary file to new message
+		$file = new UploadedFile($tmpFile);
+		$newAttachment = $this->attachmentService->addFile($this->currentUserId, $file);
+
+		return new JSONResponse($newAttachment, Http::STATUS_CREATED);
 	}
 
 	/**
