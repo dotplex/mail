@@ -8,8 +8,8 @@
 		</div>
 		<div v-if="loading" class="icon-loading" />
 		<div id="message-container" :class="{hidden: loading}">
-			<iframe id="message-frame"
-				ref="iframe"
+			<iframe ref="iframe"
+				class="message-frame"
 				:title="t('mail', 'Message frame')"
 				:src="url"
 				seamless
@@ -19,6 +19,7 @@
 </template>
 
 <script>
+import { iframeResizer } from 'iframe-resizer'
 import PrintScout from 'printscout'
 
 import logger from '../logger'
@@ -36,15 +37,33 @@ export default {
 		return {
 			loading: true,
 			hasBlockedContent: false,
+			resizer: undefined,
 		}
 	},
 	beforeMount() {
 		scout.on('beforeprint', this.onBeforePrint)
 		scout.on('afterprint', this.onAfterPrint)
 	},
+	mounted() {
+		iframeResizer({
+			initCallback: () => {
+				const getCssVar = (key) => ({
+					[key]: getComputedStyle(document.documentElement).getPropertyValue(key),
+				})
+
+				// send css vars to client page
+				this.$refs.iframe.iFrameResizer.sendMessage({
+					cssVars: {
+						...getCssVar('--color-main-text'),
+					},
+				})
+			},
+		}, this.$refs.iframe)
+	},
 	beforeDestroy() {
 		scout.off('beforeprint', this.onBeforePrint)
 		scout.off('afterprint', this.onAfterPrint)
+		this.$refs.iframe.iFrameResizer.close()
 	},
 	methods: {
 		getIframeDoc() {
@@ -97,11 +116,11 @@ export default {
 
 #message-container {
 	flex: 1;
-	min-height: 50vh;
-	display: flex;
+	max-height: 50vh;
+	overflow: auto;
 }
 
-#message-frame {
+.message-frame {
 	width: 100%;
 }
 </style>
