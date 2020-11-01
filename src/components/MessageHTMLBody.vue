@@ -116,8 +116,6 @@ export default {
 
 #message-container {
 	flex: 1;
-	max-height: 50vh;
-	overflow: auto;
 }
 
 .message-frame {

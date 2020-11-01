@@ -469,11 +469,11 @@ export default {
 
 		&.app-content-list-item-star {
 			background-image: none;
-			position: absolute;
 			opacity: 1;
-			width: 16px;
+			width: 40px;
 			height: 16px;
-			margin-left: -1px;
+			margin-left: -41px;
+			z-index: 50;
 			display: flex;
 
 			&:hover,

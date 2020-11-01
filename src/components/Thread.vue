@@ -15,12 +15,14 @@
 					</div>
 				</div>
 			</div>
-			<ThreadEnvelope v-for="env in thread"
-				:key="env.databaseId"
-				:envelope="env"
-				:mailbox-id="$route.params.mailboxId"
-				:expanded="expandedThreads.includes(env.databaseId)"
-				@toggleExpand="toggleExpand(env.databaseId)" />
+			<div class="mail-thread-envelopes">
+				<ThreadEnvelope v-for="env in thread"
+					:key="env.databaseId"
+					:envelope="env"
+					:mailbox-id="$route.params.mailboxId"
+					:expanded="expandedThreads.includes(env.databaseId)"
+					@toggleExpand="toggleExpand(env.databaseId)" />
+			</div>
 		</template>
 	</AppContentDetails>
 </template>
@@ -143,7 +145,15 @@ export default {
 
 <style lang="scss">
 #mail-message {
-	flex-grow: 1;
+	height: calc(100vh - var(--header-height));
+}
+
+.mail-thread-envelopes {
+	width: 100%;
+	height: 100%;
+	max-width: 900px;
+	margin: 0 auto;
+	overflow-y: auto;
 }
 
 .mail-message-body {
@@ -157,28 +167,26 @@ export default {
 	flex-direction: row;
 	justify-content: space-between;
 	align-items: center;
-	padding: 30px 0;
+	padding: 5px 0;
 	// somehow ios doesn't care about this !important rule
 	// so we have to manually set left/right padding to chidren
 	// for 100% to be used
 	box-sizing: content-box !important;
-	height: 44px;
 	width: 100%;
+	border-bottom: 1px solid var(--color-border);
 
 	z-index: 100;
-	position: fixed; // ie fallback
+	position: relative; // ie fallback
 	position: -webkit-sticky; // ios/safari fallback
 	position: sticky;
-	top: var(--header-height);
-	background: -webkit-linear-gradient(var(--color-main-background), var(--color-main-background) 80%, rgba(255,255,255,0));
-	background: -o-linear-gradient(var(--color-main-background), var(--color-main-background)  80%, rgba(255,255,255,0));
-	background: -moz-linear-gradient(var(--color-main-background), var(--color-main-background)  80%, rgba(255,255,255,0));
-	background: linear-gradient(var(--color-main-background), var(--color-main-background)  80%, rgba(255,255,255,0));
+	top: 0;
 }
 
 #mail-thread-header-fields {
 	// initial width
 	width: 0;
+	max-width: 900px;
+	margin: 0 auto;
 	padding-left: 60px;
 	// grow and try to fill 100%
 	flex: 1 1 auto;
