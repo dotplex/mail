@@ -110,10 +110,12 @@
 		<AppNavigationCounter v-if="mailbox.unread" slot="counter">
 			{{ mailbox.unread }}
 		</AppNavigationCounter>
+		<template slot="extra">
 		<MoveModal v-if="showMoveModal"
 			:account="account"
 			:envelopes="[]"
 			@close="onCloseMoveModal" />
+		</template>
 		<!-- submailboxes -->
 		<NavigationMailbox
 			v-for="subMailbox in subMailboxes"
