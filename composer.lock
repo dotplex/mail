@@ -1462,7 +1462,7 @@
             "license": [
                 "BSD-2-Clause"
             ],
-            "description": "A collection of stream wrappers."
+            "description": "A library of stream wrappers."
         },
         {
             "name": "pear-pear.horde.org/Horde_Stringprep",
@@ -1521,7 +1521,7 @@
             "license": [
                 "BSD-2-Clause"
             ],
-            "description": "Support classes not tied to Horde but is used by it. These classes can be used outside of Horde as well."
+            "description": "Support library not tied to Horde but used by it."
         },
         {
             "name": "pear-pear.horde.org/Horde_Text_Filter",
@@ -2098,16 +2098,16 @@
         },
         {
             "name": "symfony/polyfill-php80",
-            "version": "v1.22.1",
+            "version": "v1.24.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php80.git",
-                "reference": "dc3063ba22c2a1fd2f45ed856374d79114998f91"
+                "reference": "57b712b08eddb97c762a8caa32c84e037892d2e9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php80/zipball/dc3063ba22c2a1fd2f45ed856374d79114998f91",
-                "reference": "dc3063ba22c2a1fd2f45ed856374d79114998f91",
+                "url": "https://api.github.com/repos/symfony/polyfill-php80/zipball/57b712b08eddb97c762a8caa32c84e037892d2e9",
+                "reference": "57b712b08eddb97c762a8caa32c84e037892d2e9",
                 "shasum": ""
             },
             "require": {
@@ -2116,7 +2116,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-main": "1.22-dev"
+                    "dev-main": "1.23-dev"
                 },
                 "thanks": {
                     "name": "symfony/polyfill",
@@ -2174,7 +2174,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2021-01-07T16:49:33+00:00"
+            "time": "2021-09-13T13:58:33+00:00"
         },
         {
             "name": "youthweb/urllinker",
