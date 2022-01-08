@@ -1462,7 +1462,7 @@
             "license": [
                 "BSD-2-Clause"
             ],
-            "description": "A collection of stream wrappers."
+            "description": "A library of stream wrappers."
         },
         {
             "name": "pear-pear.horde.org/Horde_Stringprep",
@@ -1521,7 +1521,7 @@
             "license": [
                 "BSD-2-Clause"
             ],
-            "description": "Support classes not tied to Horde but is used by it. These classes can be used outside of Horde as well."
+            "description": "Support library not tied to Horde but used by it."
         },
         {
             "name": "pear-pear.horde.org/Horde_Text_Filter",
@@ -2022,16 +2022,16 @@
         },
         {
             "name": "symfony/polyfill-php73",
-            "version": "v1.22.1",
+            "version": "v1.24.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php73.git",
-                "reference": "a678b42e92f86eca04b7fa4c0f6f19d097fb69e2"
+                "reference": "cc5db0e22b3cb4111010e48785a97f670b350ca5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php73/zipball/a678b42e92f86eca04b7fa4c0f6f19d097fb69e2",
-                "reference": "a678b42e92f86eca04b7fa4c0f6f19d097fb69e2",
+                "url": "https://api.github.com/repos/symfony/polyfill-php73/zipball/cc5db0e22b3cb4111010e48785a97f670b350ca5",
+                "reference": "cc5db0e22b3cb4111010e48785a97f670b350ca5",
                 "shasum": ""
             },
             "require": {
@@ -2040,7 +2040,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-main": "1.22-dev"
+                    "dev-main": "1.23-dev"
                 },
                 "thanks": {
                     "name": "symfony/polyfill",
@@ -2094,7 +2094,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2021-01-07T16:49:33+00:00"
+            "time": "2021-06-05T21:20:04+00:00"
         },
         {
             "name": "symfony/polyfill-php80",
