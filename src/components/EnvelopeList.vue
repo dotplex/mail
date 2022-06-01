@@ -164,6 +164,7 @@
 				:mailbox="mailbox"
 				:selected="selection.includes(env.databaseId)"
 				:select-mode="selectMode"
+				:has-multiple-accounts="hasMultipleAccounts"
 				:selected-envelopes="selectedEnvelopes"
 				@delete="$emit('delete', env.databaseId)"
 				@update:selected="onEnvelopeSelectToggle(env, index, ...$event)"
@@ -243,6 +244,7 @@ export default {
 			selection: [],
 			showMoveModal: false,
 			lastToggledIndex: undefined,
+			forwardedMessages: [],
 		}
 	},
 	computed: {
@@ -289,6 +291,10 @@ export default {
 				default:
 					return translated
 			}
+		},
+		hasMultipleAccounts() {
+			const mailboxIds = this.envelopes.map(envelope => envelope.mailboxId)
+			return Array.from(new Set(mailboxIds)).length > 1
 		},
 	},
 	watch: {
@@ -451,17 +457,11 @@ export default {
 			this.showMoveModal = true
 		},
 		async forwardSelectedAsAttachment() {
-			const selected = this.selection
-			this.$router.push({
-				name: 'message',
-				params: {
-					mailboxId: this.$route.params.mailboxId,
-					threadId: 'new',
-				},
-				query: {
-					forwardedMessages: selected,
-				},
+			this.forwardedMessages = this.selection
+			await this.$store.dispatch('showMessageComposer', {
+				forwardedMessages: this.forwardedMessages,
 			})
+			this.forwardedMessages = []
 			this.unselectAll()
 		},
 		onCloseMoveModal() {

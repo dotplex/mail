@@ -1,916 +1,1305 @@
 <template>
-	<div v-if="state === STATES.EDITING" class="message-composer">
-		<div class="composer-fields mail-account">
-			<label class="from-label" for="from">
-				{{ t('mail', 'From') }}
-			</label>
-			<Multiselect
-				id="from"
-				:value="selectedAlias"
-				:options="aliases"
-				label="name"
-				track-by="selectId"
-				:searchable="false"
-				:custom-label="formatAliases"
-				:placeholder="t('mail', 'Select account')"
-				:clear-on-select="false"
-				@select="onAliasChange" />
-		</div>
-		<div class="composer-fields">
-			<label class="to-label" for="to">
-				{{ t('mail', 'To') }}
-			</label>
-			<Multiselect
-				id="to"
-				ref="toLabel"
-				v-model="selectTo"
-				:options="selectableRecipients"
-				:taggable="true"
-				label="label"
-				track-by="email"
-				:limit="4"
-				:multiple="true"
-				:placeholder="t('mail', 'Contact or email address …')"
-				:clear-on-select="false"
-				:close-on-select="false"
-				:show-no-options="false"
-				:preserve-search="true"
-				:hide-selected="true"
-				:loading="loadingIndicatorTo"
-				@keyup="onInputChanged"
-				@tag="onNewToAddr"
-				@search-change="onAutocomplete($event, 'to')" />
-			<a v-if="!showCC"
-				class="copy-toggle"
-				href="#"
-				@click.prevent="showCC = true">
-				{{ t('mail', '+ Cc/Bcc') }}
-			</a>
-		</div>
-		<div v-if="showCC" class="composer-fields">
-			<label for="cc" class="cc-label">
-				{{ t('mail', 'Cc') }}
-			</label>
-			<Multiselect
-				id="cc"
-				v-model="selectCc"
-				:options="selectableRecipients"
-				:taggable="true"
-				label="label"
-				track-by="email"
-				:multiple="true"
-				:placeholder="t('mail', '')"
-				:clear-on-select="false"
-				:show-no-options="false"
-				:preserve-search="true"
-				:loading="loadingIndicatorCc"
-				@keyup="onInputChanged"
-				@tag="onNewCcAddr"
-				@search-change="onAutocomplete($event, 'cc')">
-				<span slot="noOptions">{{ t('mail', 'No contacts found.') }}</span>
-			</Multiselect>
-		</div>
-		<div v-if="showCC" class="composer-fields">
-			<label for="bcc" class="bcc-label">
-				{{ t('mail', 'Bcc') }}
-			</label>
-			<Multiselect
-				id="bcc"
-				v-model="selectBcc"
-				:options="selectableRecipients"
-				:taggable="true"
-				label="label"
-				track-by="email"
-				:multiple="true"
-				:placeholder="t('mail', '')"
-				:show-no-options="false"
-				:preserve-search="true"
-				:loading="loadingIndicatorBcc"
-				@keyup="onInputChanged"
-				@tag="onNewBccAddr"
-				@search-change="onAutocomplete($event, 'bcc')">
-				<span slot="noOptions">{{ t('mail', 'No contacts found.') }}</span>
-			</Multiselect>
-		</div>
-		<div class="composer-fields">
-			<label for="subject" class="subject-label hidden-visually">
-				{{ t('mail', 'Subject') }}
-			</label>
-			<input
-				id="subject"
-				v-model="subjectVal"
-				type="text"
-				name="subject"
-				class="subject"
-				autocomplete="off"
-				:placeholder="t('mail', 'Subject …')"
-				@keyup="onInputChanged">
-		</div>
-		<div v-if="noReply" class="warning noreply-warning">
-			{{ t('mail', 'This message came from a noreply address so your reply will probably not be read.') }}
-		</div>
-		<div v-if="mailvelope.keysMissing.length" class="warning noreply-warning">
-			{{
-				t('mail', 'The following recipients do not have a PGP key: {recipients}.', {
-					recipients: mailvelope.keysMissing.join(', '),
-				})
-			}}
-		</div>
-		<div class="composer-fields">
-			<!--@keypress="onBodyKeyPress"-->
-			<TextEditor
-				v-if="!encrypt && editorPlainText"
-				key="editor-plain"
-				v-model="bodyVal"
-				name="body"
-				class="message-body"
-				:placeholder="t('mail', 'Write message …')"
-				:focus="isReply"
-				:bus="bus"
-				@input="onInputChanged" />
-			<TextEditor
-				v-else-if="!encrypt && !editorPlainText"
-				key="editor-rich"
-				v-model="bodyVal"
-				:html="true"
-				name="body"
-				class="message-body"
-				:placeholder="t('mail', 'Write message …')"
-				:focus="isReply"
-				:bus="bus"
-				@input="onInputChanged" />
-			<MailvelopeEditor
-				v-else
-				ref="mailvelopeEditor"
-				v-model="bodyVal"
-				:recipients="allRecipients"
-				:quoted-text="body"
-				:is-reply-or-forward="isReply || isForward" />
-		</div>
-		<div class="composer-actions">
-			<ComposerAttachments v-model="attachments"
-				:bus="bus"
-				:upload-size-limit="attachmentSizeLimit"
-				@upload="onAttachmentsUploading" />
-			<div class="composer-actions-right">
-				<p class="composer-actions-draft">
-					<span v-if="!canSaveDraft" id="draft-status">{{ t('mail', 'Cannot save draft because this account does not have a drafts mailbox configured.') }}</span>
-					<span v-else-if="savingDraft === true" id="draft-status">{{ t('mail', 'Saving draft …') }}</span>
-					<span v-else-if="savingDraft === false" id="draft-status">{{ t('mail', 'Draft saved') }}</span>
-				</p>
-				<Actions>
-					<ActionButton icon="icon-upload" @click="onAddLocalAttachment">
-						{{
-							t('mail', 'Upload attachment')
-						}}
-					</ActionButton>
-					<ActionButton icon="icon-folder" @click="onAddCloudAttachment">
-						{{
-							t('mail', 'Add attachment from Files')
-						}}
-					</ActionButton>
-					<ActionButton :disabled="encrypt" icon="icon-public" @click="onAddCloudAttachmentLink">
-						{{
-							addShareLink
-						}}
-					</ActionButton>
-					<ActionCheckbox
-						:checked="!encrypt && !editorPlainText"
-						:disabled="encrypt"
-						@check="editorMode = 'html'"
-						@uncheck="editorMode = 'plaintext'">
-						{{ t('mail', 'Enable formatting') }}
-					</ActionCheckbox>
-					<ActionCheckbox
-						:checked="requestMdn"
-						@check="requestMdn = true"
-						@uncheck="requestMdn = false">
-						{{ t('mail', 'Request a read receipt') }}
-					</ActionCheckbox>
-					<ActionCheckbox
-						v-if="mailvelope.available"
-						:checked="encrypt"
-						@check="encrypt = true"
-						@uncheck="encrypt = false">
-						{{ t('mail', 'Encrypt message with Mailvelope') }}
-					</ActionCheckbox>
-					<ActionLink v-else
-						href="https://www.mailvelope.com/"
-						target="_blank"
-						icon="icon-password">
-						{{
-							t('mail', 'Looking for a way to encrypt your emails? Install the Mailvelope browser extension!')
-						}}
-					</ActionLink>
-				</Actions>
-				<div>
-					<input
-						class="submit-message send primary icon-confirm-white"
-						type="submit"
-						:value="submitButtonTitle"
-						:disabled="!canSend"
-						@click="onSend">
-				</div>
-			</div>
-		</div>
-	</div>
-	<Loading v-else-if="state === STATES.UPLOADING" :hint="t('mail', 'Uploading attachments …')" role="alert" />
-	<Loading v-else-if="state === STATES.SENDING" :hint="t('mail', 'Sending …')" role="alert" />
-	<div v-else-if="state === STATES.ERROR" class="emptycontent" role="alert">
-		<h2>{{ t('mail', 'Error sending your message') }}</h2>
-		<p v-if="errorText">
-			{{ errorText }}
-		</p>
-		<button class="button" @click="state = STATES.EDITING">
-			{{ t('mail', 'Go back') }}
-		</button>
-		<button class="button primary" @click="onSend">
-			{{ t('mail', 'Retry') }}
-		</button>
-	</div>
-	<div v-else-if="state === STATES.WARNING" class="emptycontent" role="alert">
-		<h2>{{ t('mail', 'Warning sending your message') }}</h2>
-		<p v-if="errorText">
-			{{ errorText }}
-		</p>
-		<button class="button primary" @click="state = STATES.EDITING">
-			{{ t('mail', 'Go back') }}
-		</button>
-		<button class="button" @click="onForceSend">
-			{{ t('mail', 'Send anyway') }}
-		</button>
-	</div>
-	<div v-else class="emptycontent">
-		<h2>{{ t('mail', 'Message sent!') }}</h2>
-		<button v-if="!isReply" class="button primary" @click="reset">
-			{{ t('mail', 'Write another message') }}
-		</button>
-	</div>
+  <div v-if="state === STATES.EDITING" class="message-composer">
+    <div class="composer-fields mail-account">
+      <label class="from-label" for="from">
+        {{ t("mail", "From") }}
+      </label>
+      <Multiselect
+        id="from"
+        :value="selectedAlias"
+        :options="aliases"
+        label="name"
+        track-by="selectId"
+        :searchable="false"
+        :custom-label="formatAliases"
+        :placeholder="t('mail', 'Select account')"
+        :clear-on-select="false"
+        @select="onAliasChange"
+      />
+    </div>
+    <div class="composer-fields">
+      <label class="to-label" for="to">
+        {{ t("mail", "To") }}
+      </label>
+      <Multiselect
+        id="to"
+        ref="toLabel"
+        v-model="selectTo"
+        :options="selectableRecipients"
+        :taggable="true"
+        label="label"
+        track-by="email"
+        :limit="4"
+        :multiple="true"
+        :placeholder="t('mail', 'Contact or email address …')"
+        :clear-on-select="true"
+        :close-on-select="false"
+        :show-no-options="false"
+        :preserve-search="true"
+        :hide-selected="true"
+        :loading="loadingIndicatorTo"
+        @input="callSaveDraft(true, getMessageData)"
+        @tag="onNewToAddr"
+        @search-change="onAutocomplete($event, 'to')"
+      />
+      <a
+        v-if="!showCC"
+        class="copy-toggle"
+        href="#"
+        @click.prevent="showCC = true"
+      >
+        {{ t("mail", "+ Cc/Bcc") }}
+      </a>
+    </div>
+    <div v-if="showCC" class="composer-fields">
+      <label for="cc" class="cc-label">
+        {{ t("mail", "Cc") }}
+      </label>
+      <Multiselect
+        id="cc"
+        v-model="selectCc"
+        :options="selectableRecipients"
+        :taggable="true"
+        label="label"
+        track-by="email"
+        :multiple="true"
+        :placeholder="t('mail', '')"
+        :clear-on-select="true"
+        :show-no-options="false"
+        :preserve-search="true"
+        :loading="loadingIndicatorCc"
+        @input="callSaveDraft(true, getMessageData)"
+        @tag="onNewCcAddr"
+        @search-change="onAutocomplete($event, 'cc')"
+      >
+        <span slot="noOptions">{{ t("mail", "No contacts found.") }}</span>
+      </Multiselect>
+    </div>
+    <div v-if="showCC" class="composer-fields">
+      <label for="bcc" class="bcc-label">
+        {{ t("mail", "Bcc") }}
+      </label>
+      <Multiselect
+        id="bcc"
+        v-model="selectBcc"
+        :options="selectableRecipients"
+        :taggable="true"
+        label="label"
+        track-by="email"
+        :multiple="true"
+        :placeholder="t('mail', '')"
+        :show-no-options="false"
+        :preserve-search="true"
+        :loading="loadingIndicatorBcc"
+        @input="callSaveDraft(true, getMessageData)"
+        @tag="onNewBccAddr"
+        @search-change="onAutocomplete($event, 'bcc')"
+      >
+        <span slot="noOptions">{{ t("mail", "No contacts found.") }}</span>
+      </Multiselect>
+    </div>
+    <div class="composer-fields">
+      <label for="subject" class="subject-label hidden-visually">
+        {{ t("mail", "Subject") }}
+      </label>
+      <input
+        id="subject"
+        v-model="subjectVal"
+        type="text"
+        name="subject"
+        class="subject"
+        autocomplete="off"
+        :placeholder="t('mail', 'Subject …')"
+        @input="callSaveDraft(true, getMessageData)"
+      />
+    </div>
+    <div v-if="noReply" class="warning noreply-warning">
+      {{
+        t(
+          "mail",
+          "This message came from a noreply address so your reply will probably not be read."
+        )
+      }}
+    </div>
+    <div v-if="mailvelope.keysMissing.length" class="warning noreply-warning">
+      {{
+        t(
+          "mail",
+          "The following recipients do not have a PGP key: {recipients}.",
+          {
+            recipients: mailvelope.keysMissing.join(", "),
+          }
+        )
+      }}
+    </div>
+    <div class="composer-fields message-editor">
+      <!--@keypress="onBodyKeyPress"-->
+      <TextEditor
+        v-if="!encrypt && editorPlainText"
+        key="editor-plain"
+        v-model="bodyVal"
+        name="body"
+        class="message-body"
+        :placeholder="t('mail', 'Write message …')"
+        :focus="isReply"
+        :bus="bus"
+        @input="callSaveDraft(true, getMessageData)"
+      />
+      <TextEditor
+        v-else-if="!encrypt && !editorPlainText"
+        key="editor-rich"
+        v-model="bodyVal"
+        :html="true"
+        name="body"
+        class="message-body"
+        :placeholder="t('mail', 'Write message …')"
+        :focus="isReply"
+        :bus="bus"
+        @input="onEditorRichInputText"
+      />
+      <MailvelopeEditor
+        v-else
+        ref="mailvelopeEditor"
+        v-model="bodyVal"
+        :recipients="allRecipients"
+        :quoted-text="body"
+        :is-reply-or-forward="isReply || isForward"
+      />
+    </div>
+    <ComposerAttachments
+      v-model="attachments"
+      :bus="bus"
+      :upload-size-limit="attachmentSizeLimit"
+      @upload="onAttachmentsUploading"
+    />
+    <div class="composer-actions-right composer-actions">
+      <div class="composer-actions--primary-actions">
+        <p class="composer-actions-draft-status">
+          <span v-if="savingDraft === true" class="draft-status">{{
+            t("mail", "Saving draft …")
+          }}</span>
+          <span v-else-if="!canSaveDraft" class="draft-status">{{
+            t("mail", "Error saving draft")
+          }}</span>
+          <span v-else-if="savingDraft === false" class="draft-status">{{
+            t("mail", "Draft saved")
+          }}</span>
+        </p>
+        <VButton
+          v-if="!savingDraft && !canSaveDraft"
+          class="button"
+          type="tertiary"
+          @click="onSave"
+        >
+          <template #icon>
+            <Download :size="20" :title="t('mail', 'Save draft')" />
+          </template>
+        </VButton>
+        <VButton
+          v-if="savingDraft === false"
+          class="button"
+          type="tertiary"
+          @click="discardDraft"
+        >
+          <template #icon>
+            <Delete :size="20" :title="t('mail', 'Discard & close draft')" />
+          </template>
+        </VButton>
+      </div>
+      <div class="composer-actions--secondary-actions">
+        <Actions>
+          <template v-if="!isMoreActionsOpen">
+            <ActionButton icon="icon-upload" @click="onAddLocalAttachment">
+              {{ t("mail", "Upload attachment") }}
+            </ActionButton>
+            <ActionButton icon="icon-folder" @click="onAddCloudAttachment">
+              {{ t("mail", "Add attachment from Files") }}
+            </ActionButton>
+            <ActionButton
+              :disabled="encrypt"
+              icon="icon-public"
+              @click="onAddCloudAttachmentLink"
+            >
+              {{ addShareLink }}
+            </ActionButton>
+            <ActionButton
+              v-if="!isScheduledSendingDisabled"
+              :close-after-click="false"
+              @click="isMoreActionsOpen = true"
+            >
+              <template #icon>
+                <SendClock :size="20" :title="t('mail', 'Send later')" />
+              </template>
+              {{ t("mail", "Send later") }}
+            </ActionButton>
+            <ActionCheckbox
+              :checked="!encrypt && !editorPlainText"
+              :disabled="encrypt"
+              @check="editorMode = 'html'"
+              @uncheck="editorMode = 'plaintext'"
+            >
+              {{ t("mail", "Enable formatting") }}
+            </ActionCheckbox>
+            <ActionCheckbox
+              :checked="requestMdn"
+              @check="requestMdn = true"
+              @uncheck="requestMdn = false"
+            >
+              {{ t("mail", "Request a read receipt") }}
+            </ActionCheckbox>
+            <ActionCheckbox
+              v-if="mailvelope.available"
+              :checked="encrypt"
+              @check="encrypt = true"
+              @uncheck="encrypt = false"
+            >
+              {{ t("mail", "Encrypt message with Mailvelope") }}
+            </ActionCheckbox>
+            <ActionLink
+              v-else
+              href="https://www.mailvelope.com/"
+              target="_blank"
+              icon="icon-password"
+            >
+              {{
+                t(
+                  "mail",
+                  "Looking for a way to encrypt your emails? Install the Mailvelope browser extension!"
+                )
+              }}
+            </ActionLink>
+          </template>
+          <template v-if="isMoreActionsOpen">
+            <ActionButton
+              :close-after-click="false"
+              @click="isMoreActionsOpen = false"
+            >
+              <template #icon>
+                <ChevronLeft :title="t('mail', 'Send later')" :size="20" />
+                {{ t("mail", "Send later") }}
+              </template>
+            </ActionButton>
+            <ActionRadio
+              :value="undefined"
+              name="sendLater"
+              :checked="!sendAtVal"
+              class="send-action-radio"
+              @update:checked="sendAtVal = undefined"
+              @change="onChangeSendLater(undefined)"
+            >
+              {{ t("mail", "Send now") }}
+            </ActionRadio>
+            <ActionRadio
+              :value="dateTomorrowMorning"
+              name="sendLater"
+              :checked="isSendAtTomorrowMorning"
+              class="send-action-radio send-action-radio--multiline"
+              @update:checked="sendAtVal = dateTomorrowMorning"
+              @change="onChangeSendLater(dateTomorrowMorning)"
+            >
+              {{ t("mail", "Tomorrow morning") }} -
+              {{ convertToLocalDate(dateTomorrowMorning) }}
+            </ActionRadio>
+            <ActionRadio
+              :value="dateTomorrowAfternoon"
+              name="sendLater"
+              :checked="isSendAtTomorrowAfternoon"
+              class="send-action-radio send-action-radio--multiline"
+              @update:checked="sendAtVal = dateTomorrowAfternoon"
+              @change="onChangeSendLater(dateTomorrowAfternoon)"
+            >
+              {{ t("mail", "Tomorrow afternoon") }} -
+              {{ convertToLocalDate(dateTomorrowAfternoon) }}
+            </ActionRadio>
+            <ActionRadio
+              :value="dateMondayMorning"
+              name="sendLater"
+              :checked="isSendAtMondayMorning"
+              class="send-action-radio send-action-radio--multiline"
+              @update:checked="sendAtVal = dateMondayMorning"
+              @change="onChangeSendLater(dateMondayMorning)"
+            >
+              {{ t("mail", "Monday morning") }} -
+              {{ convertToLocalDate(dateMondayMorning) }}
+            </ActionRadio>
+            <ActionRadio
+              name="sendLater"
+              class="send-action-radio"
+              :checked="isSendAtCustom"
+              :value="customSendTime"
+              @update:checked="sendAtVal = customSendTime"
+              @change="onChangeSendLater(customSendTime)"
+            >
+              {{ t("mail", "Custom date and time") }}
+            </ActionRadio>
+            <ActionInput
+              v-model="selectedDate"
+              type="datetime-local"
+              :first-day-of-week="firstDayDatetimePicker"
+              :use12h="showAmPm"
+              :formatter="formatter"
+              :format="'YYYY-MM-DD HH:mm'"
+              icon=""
+              :minute-step="5"
+              :show-second="false"
+              :disabled-date="disabledDatetimepickerDate"
+              :disabled-time="disabledDatetimepickerTime"
+              @change="onChangeSendLater(customSendTime)"
+            >
+              {{ t("mail", "Enter a date") }}
+            </ActionInput>
+          </template>
+        </Actions>
+
+        <button
+          :disabled="!canSend"
+          class="button primary send-button"
+          type="submit"
+          @click="onSend"
+        >
+          <Send :title="submitButtonTitle" :size="20" />
+          {{ submitButtonTitle }}
+        </button>
+      </div>
+    </div>
+  </div>
+  <Loading
+    v-else-if="state === STATES.UPLOADING"
+    :hint="t('mail', 'Uploading attachments …')"
+    role="alert"
+  />
+  <Loading
+    v-else-if="state === STATES.SENDING"
+    :hint="t('mail', 'Sending …')"
+    role="alert"
+    class="sending-hint"
+  />
+  <EmptyContent
+    v-else-if="state === STATES.ERROR"
+    class="centered-content"
+    role="alert"
+  >
+    <h2>{{ t("mail", "Error sending your message") }}</h2>
+    <p v-if="errorText">
+      {{ errorText }}
+    </p>
+    <button class="button" @click="state = STATES.EDITING">
+      {{ t("mail", "Go back") }}
+    </button>
+    <button class="button primary" @click="onSend">
+      {{ t("mail", "Retry") }}
+    </button>
+  </EmptyContent>
+  <div v-else-if="state === STATES.WARNING" class="emptycontent" role="alert">
+    <h2>{{ t("mail", "Warning sending your message") }}</h2>
+    <p v-if="errorText">
+      {{ errorText }}
+    </p>
+    <button class="button primary" @click="state = STATES.EDITING">
+      {{ t("mail", "Go back") }}
+    </button>
+    <button class="button" @click="onForceSend">
+      {{ t("mail", "Send anyway") }}
+    </button>
+  </div>
+  <EmptyContent v-else icon="icon-checkmark">
+    <h2>
+      {{
+        sendAtVal
+          ? t("mail", "Message will be sent at") +
+            " " +
+            convertToLocalDate(sendAtVal)
+          : t("mail", "Message sent!")
+      }}
+    </h2>
+  </EmptyContent>
 </template>
 
 <script>
-import debounce from 'lodash/fp/debounce'
-import uniqBy from 'lodash/fp/uniqBy'
-import isArray from 'lodash/fp/isArray'
-import trimStart from 'lodash/fp/trimCharsStart'
-import Autosize from 'vue-autosize'
-import debouncePromise from 'debounce-promise'
-import Actions from '@nextcloud/vue/dist/Components/Actions'
-import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
-import ActionCheckbox from '@nextcloud/vue/dist/Components/ActionCheckbox'
-import ActionLink from '@nextcloud/vue/dist/Components/ActionLink'
-import Multiselect from '@nextcloud/vue/dist/Components/Multiselect'
-import { showError } from '@nextcloud/dialogs'
-import { translate as t } from '@nextcloud/l10n'
-import Vue from 'vue'
+import debounce from "lodash/fp/debounce";
+import uniqBy from "lodash/fp/uniqBy";
+import isArray from "lodash/fp/isArray";
+import trimStart from "lodash/fp/trimCharsStart";
+import Autosize from "vue-autosize";
+import debouncePromise from "debounce-promise";
+import Actions from "@nextcloud/vue/dist/Components/Actions";
+import ActionButton from "@nextcloud/vue/dist/Components/ActionButton";
+import ActionCheckbox from "@nextcloud/vue/dist/Components/ActionCheckbox";
+import ActionInput from "@nextcloud/vue/dist/Components/ActionInput";
+import ActionLink from "@nextcloud/vue/dist/Components/ActionLink";
+import ActionRadio from "@nextcloud/vue/dist/Components/ActionRadio";
+import Button from "@nextcloud/vue/dist/Components/Button";
+import ChevronLeft from "vue-material-design-icons/ChevronLeft";
+import Delete from "vue-material-design-icons/Delete";
+import ComposerAttachments from "./ComposerAttachments";
+import Download from "vue-material-design-icons/Download";
+import EmptyContent from "@nextcloud/vue/dist/Components/EmptyContent";
+import Multiselect from "@nextcloud/vue/dist/Components/Multiselect";
+import { showError } from "@nextcloud/dialogs";
+import {
+  translate as t,
+  getCanonicalLocale,
+  getFirstDay,
+  getLocale,
+} from "@nextcloud/l10n";
+import Vue from "vue";
 
-import ComposerAttachments from './ComposerAttachments'
-import { findRecipient } from '../service/AutocompleteService'
-import { detect, html, plain, toHtml, toPlain } from '../util/text'
-import Loading from './Loading'
-import logger from '../logger'
-import TextEditor from './TextEditor'
-import { buildReplyBody } from '../ReplyBuilder'
-import MailvelopeEditor from './MailvelopeEditor'
-import { getMailvelope } from '../crypto/mailvelope'
-import { isPgpgMessage } from '../crypto/pgp'
-import { matchError } from '../errors/match'
-import NoSentMailboxConfiguredError
-	from '../errors/NoSentMailboxConfiguredError'
-import NoDraftsMailboxConfiguredError
-	from '../errors/NoDraftsMailboxConfiguredError'
-import ManyRecipientsError
-	from '../errors/ManyRecipientsError'
+import { findRecipient } from "../service/AutocompleteService";
+import { detect, html, plain, toHtml, toPlain } from "../util/text";
+import Loading from "./Loading";
+import logger from "../logger";
+import TextEditor from "./TextEditor";
+import { buildReplyBody } from "../ReplyBuilder";
+import MailvelopeEditor from "./MailvelopeEditor";
+import { getMailvelope } from "../crypto/mailvelope";
+import { isPgpgMessage } from "../crypto/pgp";
+import { matchError } from "../errors/match";
+import NoSentMailboxConfiguredError from "../errors/NoSentMailboxConfiguredError";
+import NoDraftsMailboxConfiguredError from "../errors/NoDraftsMailboxConfiguredError";
+import ManyRecipientsError from "../errors/ManyRecipientsError";
 
-const debouncedSearch = debouncePromise(findRecipient, 500)
+import Send from "vue-material-design-icons/Send";
+import SendClock from "vue-material-design-icons/SendClock";
+import moment from "@nextcloud/moment";
+import { mapGetters } from "vuex";
 
-const NO_ALIAS_SET = -1
+const debouncedSearch = debouncePromise(findRecipient, 500);
 
-Vue.use(Autosize)
+const NO_ALIAS_SET = -1;
+
+Vue.use(Autosize);
 
 const STATES = Object.seal({
-	EDITING: 0,
-	UPLOADING: 1,
-	SENDING: 2,
-	ERROR: 3,
-	WARNING: 4,
-	FINISHED: 5,
-})
+  EDITING: 0,
+  UPLOADING: 1,
+  SENDING: 2,
+  ERROR: 3,
+  WARNING: 4,
+  FINISHED: 5,
+  DISCARDING: 6,
+  DISCARDED: 7,
+});
 
 export default {
-	name: 'Composer',
-	components: {
-		MailvelopeEditor,
-		Actions,
-		ActionButton,
-		ActionCheckbox,
-		ActionLink,
-		ComposerAttachments,
-		Loading,
-		Multiselect,
-		TextEditor,
-	},
-	props: {
-		fromAccount: {
-			type: Number,
-			default: () => undefined,
-		},
-		to: {
-			type: Array,
-			default: () => [],
-		},
-		cc: {
-			type: Array,
-			default: () => [],
-		},
-		bcc: {
-			type: Array,
-			default: () => [],
-		},
-		subject: {
-			type: String,
-			default: '',
-		},
-		body: {
-			type: Object,
-			default: () => html(''),
-		},
-		draft: {
-			type: Function,
-			required: true,
-		},
-		send: {
-			type: Function,
-			required: true,
-		},
-		replyTo: {
-			type: Object,
-			required: false,
-			default: () => undefined,
-		},
-		forwardFrom: {
-			type: Object,
-			required: false,
-			default: () => undefined,
-		},
-	},
-	data() {
-		let bodyVal = toHtml(this.body).value
-		if (bodyVal.length === 0) {
-			// an empty body (e.g "") does not trigger an onInput event.
-			// but to append the signature a onInput event is required.
-			bodyVal = '<p></p><p></p>'
-		}
-		return {
-			showCC: this.cc.length > 0,
-			selectedAlias: NO_ALIAS_SET, // Fixed in `beforeMount`
-			autocompleteRecipients: this.to.concat(this.cc).concat(this.bcc),
-			newRecipients: [],
-			subjectVal: this.subject,
-			bodyVal,
-			attachments: [],
-			noReply: this.to.some((to) => to.email.startsWith('noreply@') || to.email.startsWith('no-reply@')),
-			draftsPromise: Promise.resolve(),
-			attachmentsPromise: Promise.resolve(),
-			canSaveDraft: true,
-			savingDraft: undefined,
-			saveDraftDebounced: debounce(10 * 1000, this.saveDraft),
-			state: STATES.EDITING,
-			errorText: undefined,
-			STATES,
-			selectTo: this.to,
-			selectCc: this.cc,
-			selectBcc: this.bcc,
-			bus: new Vue(),
-			encrypt: false,
-			mailvelope: {
-				available: false,
-				keyRing: undefined,
-				keysMissing: [],
-			},
-			editorMode: 'html',
-			addShareLink: t('mail', 'Add share link from {productName} Files', { productName: OC?.theme?.name ?? 'Nextcloud' }),
-			requestMdn: false,
-			appendSignature: true,
-			loadingIndicatorTo: false,
-			loadingIndicatorCc: false,
-			loadingIndicatorBcc: false,
-		}
-	},
-	computed: {
-		aliases() {
-			let cnt = 0
-			const accounts = this.$store.getters.accounts.filter((a) => !a.isUnified)
-			const aliases = accounts.flatMap((account) => [
-				{
-					id: account.id,
-					aliasId: null,
-					selectId: cnt++,
-					editorMode: account.editorMode,
-					signature: account.signature,
-					name: account.name,
-					emailAddress: account.emailAddress,
-					signatureAboveQuote: account.signatureAboveQuote,
-				},
-				account.aliases.map((alias) => {
-					return {
-						id: account.id,
-						aliasId: alias.id,
-						selectId: cnt++,
-						editorMode: account.editorMode,
-						signature: alias.signature,
-						name: alias.name,
-						emailAddress: alias.alias,
-						signatureAboveQuote: account.signatureAboveQuote,
-					}
-				}),
-			])
-			return aliases.flat()
-		},
-		allRecipients() {
-			return this.selectTo.concat(this.selectCc).concat(this.selectBcc)
-		},
-		attachmentSizeLimit() {
-			return this.$store.getters.getPreference('attachment-size-limit')
-		},
-		selectableRecipients() {
-			return this.newRecipients
-				.concat(this.autocompleteRecipients)
-				.map((recipient) => ({ ...recipient, label: recipient.label || recipient.email }))
-		},
-		isForward() {
-			return this.forwardFrom !== undefined
-		},
-		isReply() {
-			return this.replyTo !== undefined
-		},
-		canSend() {
-			if (this.encrypt && this.mailvelope.keysMissing.length) {
-				return false
-			}
+  name: "Composer",
+  components: {
+    MailvelopeEditor,
+    Actions,
+    ActionButton,
+    ActionCheckbox,
+    ActionInput,
+    ActionLink,
+    ActionRadio,
+    VButton: Button,
+    ComposerAttachments,
+    ChevronLeft,
+    Delete,
+    Download,
+    Loading,
+    Multiselect,
+    TextEditor,
+    EmptyContent,
+    Send,
+    SendClock,
+  },
+  props: {
+    fromAccount: {
+      type: Number,
+      default: () => undefined,
+    },
+    to: {
+      type: Array,
+      default: () => [],
+    },
+    cc: {
+      type: Array,
+      default: () => [],
+    },
+    bcc: {
+      type: Array,
+      default: () => [],
+    },
+    subject: {
+      type: String,
+      default: "",
+    },
+    body: {
+      type: Object,
+      default: () => html(""),
+    },
+    draftId: {
+      type: Number,
+      default: undefined,
+    },
+    draft: {
+      type: Function,
+      required: true,
+    },
+    send: {
+      type: Function,
+      required: true,
+    },
+    replyTo: {
+      type: Object,
+      required: false,
+      default: () => undefined,
+    },
+    forwardFrom: {
+      type: Object,
+      required: false,
+      default: () => undefined,
+    },
+    forwardedMessages: {
+      type: Array,
+      required: false,
+      default: () => [],
+    },
+    sendAt: {
+      type: Number,
+      default: undefined,
+    },
+    attachmentsData: {
+      type: Array,
+      default: () => [],
+    },
+  },
+  data() {
+    let bodyVal = toHtml(this.body).value;
+    if (bodyVal.length === 0) {
+      // an empty body (e.g "") does not trigger an onInput event.
+      // but to append the signature a onInput event is required.
+      bodyVal = "<p></p><p></p>";
+    }
 
-			return this.selectTo.length > 0 || this.selectCc.length > 0 || this.selectBcc.length > 0
-		},
-		editorPlainText() {
-			return this.editorMode === 'plaintext'
-		},
-		submitButtonTitle() {
-			if (!this.mailvelope.available) {
-				return t('mail', 'Send')
-			}
+    // Set default custom date time picker value to now + 1 hour
+    const selectedDate = new Date();
+    selectedDate.setHours(selectedDate.getHours() + 1);
 
-			return this.encrypt ? t('mail', 'Encrypt and send') : t('mail', 'Send unencrypted')
-		},
-	},
-	watch: {
-		'$route.params.threadId'() {
-			this.reset()
-		},
-		allRecipients() {
-			this.checkRecipientsKeys()
-		},
-		aliases(newAliases) {
-			console.debug('aliases changed')
-			if (this.selectedAlias === NO_ALIAS_SET) {
-				return
-			}
+    return {
+      showCC: this.cc.length > 0,
+      selectedAlias: NO_ALIAS_SET, // Fixed in `beforeMount`
+      autocompleteRecipients: this.to.concat(this.cc).concat(this.bcc),
+      newRecipients: [],
+      subjectVal: this.subject,
+      bodyVal,
+      attachments: this.attachmentsData,
+      noReply: this.to.some(
+        (to) =>
+          to.email.startsWith("noreply@") || to.email.startsWith("no-reply@")
+      ),
+      draftsPromise: Promise.resolve(this.draftId),
+      attachmentsPromise: Promise.resolve(),
+      canSaveDraft: true,
+      savingDraft: undefined,
+      saveDraftDebounced: debounce(10 * 1000, this.saveDraft),
+      state: STATES.EDITING,
+      errorText: undefined,
+      STATES,
+      selectTo: this.to,
+      selectCc: this.cc,
+      selectBcc: this.bcc,
+      bus: new Vue(),
+      encrypt: false,
+      mailvelope: {
+        available: false,
+        keyRing: undefined,
+        keysMissing: [],
+      },
+      editorMode: this.body?.format !== "html" ? "plaintext" : "html",
+      addShareLink: t("mail", "Add share link from {productName} Files", {
+        productName: OC?.theme?.name ?? "Nextcloud",
+      }),
+      requestMdn: false,
+      appendSignature: true,
+      loadingIndicatorTo: false,
+      loadingIndicatorCc: false,
+      loadingIndicatorBcc: false,
+      isMoreActionsOpen: false,
+      selectedDate,
+      sendAtVal: this.sendAt,
+      firstDayDatetimePicker: getFirstDay() === 0 ? 7 : getFirstDay(),
+      formatter: {
+        stringify: (date) => {
+          return date ? moment(date).format("LLL") : "";
+        },
+        parse: (value) => {
+          return value ? moment(value, "LLL").toDate() : null;
+        },
+      },
+      editorRichInputTextReady: false,
+    };
+  },
+  computed: {
+    ...mapGetters(["isScheduledSendingDisabled"]),
+    aliases() {
+      let cnt = 0;
+      const accounts = this.$store.getters.accounts.filter((a) => !a.isUnified);
+      const aliases = accounts.flatMap((account) => [
+        {
+          id: account.id,
+          aliasId: null,
+          selectId: cnt++,
+          editorMode: account.editorMode,
+          signature: account.signature,
+          name: account.name,
+          emailAddress: account.emailAddress,
+          signatureAboveQuote: account.signatureAboveQuote,
+        },
+        account.aliases.map((alias) => {
+          return {
+            id: account.id,
+            aliasId: alias.id,
+            selectId: cnt++,
+            editorMode: account.editorMode,
+            signature: alias.signature,
+            name: alias.name,
+            emailAddress: alias.alias,
+            signatureAboveQuote: account.signatureAboveQuote,
+          };
+        }),
+      ]);
+      return aliases.flat();
+    },
+    allRecipients() {
+      return this.selectTo.concat(this.selectCc).concat(this.selectBcc);
+    },
+    attachmentSizeLimit() {
+      return this.$store.getters.getPreference("attachment-size-limit");
+    },
+    selectableRecipients() {
+      return this.newRecipients
+        .concat(this.autocompleteRecipients)
+        .map((recipient) => ({
+          ...recipient,
+          label: recipient.label || recipient.email,
+        }));
+    },
+    isForward() {
+      return this.forwardFrom !== undefined;
+    },
+    isReply() {
+      return this.replyTo !== undefined;
+    },
+    canSend() {
+      if (this.encrypt && this.mailvelope.keysMissing.length) {
+        return false;
+      }
 
-			const newAlias = newAliases.find(alias => alias.id === this.selectedAlias.id && alias.aliasId === this.selectedAlias.aliasId)
-			if (newAlias === undefined) {
-				// selected alias does not exist anymore.
-				this.onAliasChange(newAliases[0])
-			} else {
-				// update the selected alias
-				this.onAliasChange(newAlias)
-			}
-		},
-	},
-	async beforeMount() {
-		this.setAlias()
-		this.initBody()
+      return (
+        this.selectTo.length > 0 ||
+        this.selectCc.length > 0 ||
+        this.selectBcc.length > 0
+      );
+    },
+    editorPlainText() {
+      return this.editorMode === "plaintext";
+    },
+    submitButtonTitle() {
+      if (this.sendAtVal) {
+        return (
+          t("mail", "Send later") +
+          ` ${this.convertToLocalDate(this.sendAtVal)}`
+        );
+      }
+      if (!this.mailvelope.available) {
+        return t("mail", "Send");
+      }
 
-		await this.onMailvelopeLoaded(await getMailvelope())
-	},
-	mounted() {
-		if (!this.isReply) {
-			this.$refs.toLabel.$el.focus()
-		}
+      return this.encrypt
+        ? t("mail", "Encrypt and send")
+        : t("mail", "Send unencrypted");
+    },
+    dateTomorrowMorning() {
+      const today = new Date();
+      today.setTime(today.getTime() + 24 * 60 * 60 * 1000);
+      return today.setHours(9, 0, 0, 0);
+    },
+    dateTomorrowAfternoon() {
+      const today = new Date();
+      today.setTime(today.getTime() + 24 * 60 * 60 * 1000);
+      return today.setHours(14, 0, 0, 0);
+    },
+    dateMondayMorning() {
+      const today = new Date();
+      today.setHours(9, 0, 0, 0);
+      return today.setDate(today.getDate() + ((7 - today.getDay()) % 7) + 1);
+    },
+    customSendTime() {
+      return new Date(this.selectedDate).getTime();
+    },
+    showAmPm() {
+      const localeData = moment().locale(getLocale()).localeData();
+      const timeFormat = localeData.longDateFormat("LT").toLowerCase();
 
-		// event is triggered when user clicks 'new message' in navigation
-		this.$root.$on('newMessage', () => {
-			this.draftsPromise
-				.then(() => {
-					return this.saveDraft(this.getMessageData)
-				})
-				.then(() => {
-					// wait for the draft to be saved before resetting the message content
-					this.reset()
-				})
-		})
+      return timeFormat.indexOf("a") !== -1;
+    },
+    isSendAtTomorrowMorning() {
+      return (
+        this.sendAtVal &&
+        Math.floor(this.dateTomorrowMorning / 1000) ===
+          Math.floor(this.sendAtVal / 1000)
+      );
+    },
+    isSendAtTomorrowAfternoon() {
+      return (
+        this.sendAtVal &&
+        Math.floor(this.dateTomorrowAfternoon / 1000) ===
+          Math.floor(this.sendAtVal / 1000)
+      );
+    },
+    isSendAtMondayMorning() {
+      return (
+        this.sendAtVal &&
+        Math.floor(this.dateMondayMorning / 1000) ===
+          Math.floor(this.sendAtVal / 1000)
+      );
+    },
+    isSendAtCustom() {
+      return (
+        this.sendAtVal &&
+        !this.isSendAtTomorrowMorning &&
+        !this.isSendAtTomorrowAfternoon &&
+        !this.isSendAtMondayMorning
+      );
+    },
+  },
+  watch: {
+    "$route.params.threadId"() {
+      this.reset();
+    },
+    allRecipients() {
+      this.checkRecipientsKeys();
+    },
+    aliases(newAliases) {
+      console.debug("aliases changed");
+      if (this.selectedAlias === NO_ALIAS_SET) {
+        return;
+      }
 
-		// Add attachments in case of forward
-		if (this.forwardFrom?.attachments !== undefined) {
-			this.forwardFrom.attachments.forEach(att => {
-				this.attachments.push({
-					fileName: att.fileName,
-					displayName: trimStart('/', att.fileName),
-					id: att.id,
-					messageId: this.forwardFrom.databaseId,
-					type: 'message-attachment',
-				})
-			})
-		}
+      const newAlias = newAliases.find(
+        (alias) =>
+          alias.id === this.selectedAlias.id &&
+          alias.aliasId === this.selectedAlias.aliasId
+      );
+      if (newAlias === undefined) {
+        // selected alias does not exist anymore.
+        this.onAliasChange(newAliases[0]);
+      } else {
+        // update the selected alias
+        this.onAliasChange(newAlias);
+      }
+    },
+  },
+  async beforeMount() {
+    this.setAlias();
+    // there's a race condition on the ckeditor initialization and we need to delay it for the initBody to work
+    this.$nextTick(() => {
+      this.initBody();
+    });
+    await this.onMailvelopeLoaded(await getMailvelope());
+  },
+  mounted() {
+    if (!this.isReply) {
+      this.$refs.toLabel.$el.focus();
+    }
 
-		// Add messages forwarded as attachments
-		let forwards = []
-		if (this.$route.query.forwardedMessages && !isArray(this.$route.query.forwardedMessages)) {
-			forwards = [this.$route.query.forwardedMessages]
-		} else if (this.$route.query.forwardedMessages && isArray(this.$route.query.forwardedMessages)) {
-			forwards = this.$route.query.forwardedMessages
-		}
-		forwards.forEach(id => {
-			const env = this.$store.getters.getEnvelope(id)
-			if (!env) {
-				// TODO: also happens when the composer page is reloaded
-				showError(t('mail', 'Message {id} could not be found', {
-					id,
-				}))
-				return
-			}
+    // Add attachments in case of forward
+    if (this.forwardFrom?.attachments !== undefined) {
+      this.forwardFrom.attachments.forEach((att) => {
+        this.attachments.push({
+          fileName: att.fileName,
+          displayName: trimStart("/", att.fileName),
+          id: att.id,
+          messageId: this.forwardFrom.databaseId,
+          type: "message-attachment",
+        });
+      });
+    }
+    // Add messages forwarded as attachments
+    let forwards = [];
+    if (this.forwardedMessages && !isArray(this.forwardedMessages)) {
+      forwards = [this.forwardedMessages];
+    } else if (this.forwardedMessages && isArray(this.forwardedMessages)) {
+      forwards = this.forwardedMessages;
+    }
+    forwards.forEach((id) => {
+      const env = this.$store.getters.getEnvelope(id);
+      if (!env) {
+        // TODO: also happens when the composer page is reloaded
+        showError(
+          t("mail", "Message {id} could not be found", {
+            id,
+          })
+        );
+        return;
+      }
 
-			this.attachments.push({
-				displayName: env.subject + '.eml',
-				id,
-				type: 'message',
-			})
-		})
-	},
-	beforeDestroy() {
-		this.$root.$off('newMessage')
+      this.attachments.push({
+        displayName: env.subject + ".eml",
+        id,
+        type: "message",
+      });
+    });
 
-		window.removeEventListener('mailvelope', this.onMailvelopeLoaded)
-	},
-	methods: {
-		setAlias() {
-			const previous = this.selectedAlias
-			if (this.fromAccount) {
-				this.selectedAlias = this.aliases.find((alias) => alias.id === this.fromAccount)
-			} else {
-				this.selectedAlias = this.aliases[0]
-			}
-			if (previous === NO_ALIAS_SET) {
-				this.editorMode = this.selectedAlias.editorMode
-			}
-		},
-		async checkRecipientsKeys() {
-			if (!this.encrypt || !this.mailvelope.available) {
-				return
-			}
+    // Set custom date and time picker value if initialized with custom send at value
+    if (this.sendAt && this.isSendAtCustom) {
+      this.selectedDate = new Date(this.sendAt);
+    }
+  },
+  beforeDestroy() {
+    window.removeEventListener("mailvelope", this.onMailvelopeLoaded);
+  },
+  methods: {
+    setAlias() {
+      const previous = this.selectedAlias;
+      if (this.fromAccount) {
+        this.selectedAlias = this.aliases.find(
+          (alias) => alias.id === this.fromAccount
+        );
+      } else {
+        this.selectedAlias = this.aliases[0];
+      }
+      // Only overwrite editormode if body is empty
+      if (previous === NO_ALIAS_SET && (!this.body || this.body.value === "")) {
+        this.editorMode = this.selectedAlias.editorMode;
+      }
+    },
+    async checkRecipientsKeys() {
+      if (!this.encrypt || !this.mailvelope.available) {
+        return;
+      }
 
-			const recipients = this.allRecipients.map((r) => r.email)
-			const keysValid = await this.mailvelope.keyRing.validKeyForAddress(recipients)
-			logger.debug('recipients keys validated', { recipients, keysValid })
-			this.mailvelope.keysMissing = recipients.filter((r) => keysValid[r] === false)
-		},
-		initBody() {
-			/** @var {Text} body **/
-			let body
-			if (this.replyTo) {
-				body = buildReplyBody(
-					this.editorPlainText ? toPlain(this.body) : toHtml(this.body),
-					this.replyTo.from[0],
-					this.replyTo.dateInt,
-					this.$store.getters.getPreference('reply-mode', 'top') === 'top'
-				).value
-			} else if (this.forwardFrom) {
-				body = buildReplyBody(
-					this.editorPlainText ? toPlain(this.body) : toHtml(this.body),
-					this.forwardFrom.from[0],
-					this.forwardFrom.dateInt,
-					this.$store.getters.getPreference('reply-mode', 'top') === 'top'
-				).value
-			} else {
-				body = this.bodyVal
-			}
-			this.bodyVal = html(body).value
-		},
-		recipientToRfc822(recipient) {
-			if (recipient.email === recipient.label) {
-				// From mailto or sender without proper label
-				return recipient.email
-			} else if (recipient.label === '') {
-				// Invalid label
-				return recipient.email
-			} else if (recipient.email.search(/^[a-zA-Z]+:/) === 0) {
-				// Group integration
-				return recipient.email
-			} else {
-				// Proper layout with label
-				return `"${recipient.label}" <${recipient.email}>`
-			}
-		},
-		getMessageData(id) {
-			return {
-				account: this.selectedAlias.id,
-				aliasId: this.selectedAlias.aliasId,
-				to: this.selectTo.map(this.recipientToRfc822).join(', '),
-				cc: this.selectCc.map(this.recipientToRfc822).join(', '),
-				bcc: this.selectBcc.map(this.recipientToRfc822).join(', '),
-				draftId: id,
-				subject: this.subjectVal,
-				body: this.encrypt ? plain(this.bodyVal) : html(this.bodyVal),
-				attachments: this.attachments,
-				messageId: this.replyTo ? this.replyTo.databaseId : undefined,
-				isHtml: !this.editorPlainText,
-				requestMdn: this.requestMdn,
-			}
-		},
-		saveDraft(data) {
-			this.savingDraft = true
-			this.draftsPromise = this.draftsPromise
-				.then((id) => {
-					const draftData = data(id)
-					if (
-						!id
-						&& !draftData.subject
-						&& !draftData.body
-						&& !draftData.cc
-						&& !draftData.bcc
-						&& !draftData.to
-					) {
-						// this might happen after a call to reset()
-						// where the text input gets reset as well
-						// and fires an input event
-						logger.debug('Nothing substantial to save, ignoring draft save')
-						this.savingDraft = false
-						return id
-					}
-					return this.draft(draftData)
-				})
-				.then((uid) => {
-					// It works (again)
-					this.canSaveDraft = true
+      const recipients = this.allRecipients.map((r) => r.email);
+      const keysValid = await this.mailvelope.keyRing.validKeyForAddress(
+        recipients
+      );
+      logger.debug("recipients keys validated", { recipients, keysValid });
+      this.mailvelope.keysMissing = recipients.filter(
+        (r) => keysValid[r] === false
+      );
+    },
+    initBody() {
+      /** @var {Text} body **/
+      let body;
+      if (this.replyTo) {
+        body = buildReplyBody(
+          this.editorPlainText ? toPlain(this.body) : toHtml(this.body),
+          this.replyTo.from[0],
+          this.replyTo.dateInt,
+          this.$store.getters.getPreference("reply-mode", "top") === "top"
+        ).value;
+      } else if (this.forwardFrom) {
+        body = buildReplyBody(
+          this.editorPlainText ? toPlain(this.body) : toHtml(this.body),
+          this.forwardFrom.from[0],
+          this.forwardFrom.dateInt,
+          this.$store.getters.getPreference("reply-mode", "top") === "top"
+        ).value;
+      } else {
+        body = this.bodyVal;
+      }
+      this.bodyVal = html(body).value;
+    },
+    getMessageData(id) {
+      return {
+        // TODO: Rename account to accountId
+        account: this.selectedAlias.id,
+        accountId: this.selectedAlias.id,
+        aliasId: this.selectedAlias.aliasId,
+        to: this.selectTo,
+        cc: this.selectCc,
+        bcc: this.selectBcc,
+        draftId: id,
+        subject: this.subjectVal,
+        body: this.encrypt ? plain(this.bodyVal) : html(this.bodyVal),
+        attachments: this.attachments,
+        inReplyToMessageId: this.replyTo ? this.replyTo.messageId : undefined,
+        isHtml: !this.editorPlainText,
+        requestMdn: this.requestMdn,
+        sendAt: this.sendAtVal ? Math.floor(this.sendAtVal / 1000) : undefined,
+      };
+    },
+    saveDraft(data) {
+      this.savingDraft = true;
+      this.draftsPromise = this.draftsPromise
+        .then((id) => {
+          const draftData = data(id);
+          if (
+            !id &&
+            !draftData.subject &&
+            !draftData.body &&
+            !draftData.cc &&
+            !draftData.bcc &&
+            !draftData.to &&
+            !draftData.sendAt
+          ) {
+            // this might happen after a call to reset()
+            // where the text input gets reset as well
+            // and fires an input event
+            logger.debug("Nothing substantial to save, ignoring draft save");
+            this.savingDraft = false;
+            return id;
+          }
+          return this.draft(draftData);
+        })
+        .then((uid) => {
+          // It works (again)
+          this.canSaveDraft = true;
 
-					return uid
-				})
-				.catch(async(error) => {
-					console.error('could not save draft', error)
-					const canSave = await matchError(error, {
-						[NoDraftsMailboxConfiguredError.getName()]() {
-							return false
-						},
-						default() {
-							return true
-						},
-					})
-					if (!canSave) {
-						this.canSaveDraft = false
-					}
-				})
-				.then((uid) => {
-					this.savingDraft = false
-					return uid
-				})
-			return this.draftsPromise
-		},
-		onInputChanged() {
-			this.saveDraftDebounced(this.getMessageData)
-			if (this.appendSignature) {
-				const signatureValue = toHtml(detect(this.selectedAlias.signature)).value
-				this.bus.$emit('insertSignature', signatureValue, this.selectedAlias.signatureAboveQuote)
-				this.appendSignature = false
-			}
-		},
-		onAliasChange(alias) {
-			logger.debug('changed alias', { alias })
-			this.selectedAlias = alias
-			this.appendSignature = true
-			this.onInputChanged()
-		},
-		onAddLocalAttachment() {
-			this.bus.$emit('onAddLocalAttachment')
-		},
-		onAddCloudAttachment() {
-			this.bus.$emit('onAddCloudAttachment')
-		},
-		onAddCloudAttachmentLink() {
-			this.bus.$emit('onAddCloudAttachmentLink')
-		},
-		onAutocomplete(term, loadingIndicator) {
-			if (term === undefined || term === '') {
-				return
-			}
-			this.loadingIndicatorTo = loadingIndicator === 'to'
-			this.loadingIndicatorCc = loadingIndicator === 'cc'
-			this.loadingIndicatorBcc = loadingIndicator === 'bcc'
-			debouncedSearch(term).then((results) => {
-				if (loadingIndicator === 'to') {
-					this.loadingIndicatorTo = false
-				} else if (loadingIndicator === 'cc') {
-					this.loadingIndicatorCc = false
-				} else if (loadingIndicator === 'bcc') {
-					this.loadingIndicatorBcc = false
-				}
-				this.autocompleteRecipients = uniqBy('email')(this.autocompleteRecipients.concat(results))
-			})
-		},
-		onAttachmentsUploading(uploaded) {
-			this.attachmentsPromise = this.attachmentsPromise
-				.then(() => uploaded)
-				.catch((error) => logger.error('could not upload attachments', { error }))
-				.then(() => logger.debug('attachments uploaded'))
-		},
-		async onMailvelopeLoaded(mailvelope) {
-			this.encrypt = isPgpgMessage(this.body)
-			this.mailvelope.available = true
-			logger.info('Mailvelope loaded', {
-				encrypt: this.encrypt,
-				isPgpgMessage: isPgpgMessage(this.body),
-				keyRing: this.mailvelope.keyRing,
-			})
-			this.mailvelope.keyRing = await mailvelope.getKeyring()
-			await this.checkRecipientsKeys()
-		},
-		onNewToAddr(addr) {
-			this.onNewAddr(addr, this.selectTo)
-		},
-		onNewCcAddr(addr) {
-			this.onNewAddr(addr, this.selectCc)
-		},
-		onNewBccAddr(addr) {
-			this.onNewAddr(addr, this.selectBcc)
-		},
-		onNewAddr(addr, list) {
-			const res = {
-				label: addr, // TODO: parse if possible
-				email: addr, // TODO: parse if possible
-			}
-			this.newRecipients.push(res)
-			list.push(res)
-		},
-		async onSend(_, force = false) {
-			if (this.encrypt) {
-				logger.debug('get encrypted message from mailvelope')
-				await this.$refs.mailvelopeEditor.pull()
-			}
+          return uid;
+        })
+        .catch(async (error) => {
+          await matchError(error, {
+            [NoDraftsMailboxConfiguredError.getName()]() {
+              return false;
+            },
+            default() {
+              return true;
+            },
+          });
+          this.canSaveDraft = false;
+        })
+        .then((uid) => {
+          this.savingDraft = false;
+          return uid;
+        });
+      return this.draftsPromise;
+    },
+    callSaveDraft(withDebounce, ...args) {
+      if (withDebounce) {
+        return this.saveDraftDebounced(...args);
+      } else {
+        return this.saveDraft(...args);
+      }
+    },
+    onSave() {
+      this.callSaveDraft(false, this.getMessageData);
+    },
+    onInputChanged() {
+      this.callSaveDraft(true, this.getMessageData);
+      if (this.appendSignature) {
+        const signatureValue = toHtml(
+          detect(this.selectedAlias.signature)
+        ).value;
+        this.bus.$emit(
+          "insertSignature",
+          signatureValue,
+          this.selectedAlias.signatureAboveQuote
+        );
+        this.appendSignature = false;
+      }
+    },
+    // needs to bypass an input event of the first initialisation, because of:
+    // an empty body (e.g "") does not trigger an onInput event.
+    // but to append the signature a onInput event is required.
+    onEditorRichInputText() {
+      if (this.editorRichInputTextReady) {
+        this.callSaveDraft(true, this.getMessageData);
+      }
+      this.editorRichInputTextReady = true;
+    },
+    onChangeSendLater(value) {
+      this.sendAtVal = value ? Number.parseInt(value, 10) : undefined;
+    },
+    convertToLocalDate(timestamp) {
+      const options = {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      };
+      return new Date(timestamp).toLocaleString(getCanonicalLocale(), options);
+    },
+    onAliasChange(alias) {
+      logger.debug("changed alias", { alias });
+      this.selectedAlias = alias;
+      this.appendSignature = true;
+      this.onInputChanged();
+    },
+    onAddLocalAttachment() {
+      this.bus.$emit("onAddLocalAttachment");
+      this.callSaveDraft(true, this.getMessageData);
+    },
+    onAddCloudAttachment() {
+      this.bus.$emit("onAddCloudAttachment");
+      this.callSaveDraft(true, this.getMessageData);
+    },
+    onAddCloudAttachmentLink() {
+      this.bus.$emit("onAddCloudAttachmentLink");
+    },
+    onAutocomplete(term, loadingIndicator) {
+      if (term === undefined || term === "") {
+        return;
+      }
+      this.loadingIndicatorTo = loadingIndicator === "to";
+      this.loadingIndicatorCc = loadingIndicator === "cc";
+      this.loadingIndicatorBcc = loadingIndicator === "bcc";
+      debouncedSearch(term).then((results) => {
+        if (loadingIndicator === "to") {
+          this.loadingIndicatorTo = false;
+        } else if (loadingIndicator === "cc") {
+          this.loadingIndicatorCc = false;
+        } else if (loadingIndicator === "bcc") {
+          this.loadingIndicatorBcc = false;
+        }
+        this.autocompleteRecipients = uniqBy("email")(
+          this.autocompleteRecipients.concat(results)
+        );
+      });
+    },
+    onAttachmentsUploading(uploaded) {
+      this.attachmentsPromise = this.attachmentsPromise
+        .then(() => uploaded)
+        .then(() => this.callSaveDraft(true, this.getMessageData))
+        .catch((error) =>
+          logger.error("could not upload attachments", { error })
+        )
+        .then(() => logger.debug("attachments uploaded"));
+    },
+    async onMailvelopeLoaded(mailvelope) {
+      this.encrypt = isPgpgMessage(this.body);
+      this.mailvelope.available = true;
+      logger.info("Mailvelope loaded", {
+        encrypt: this.encrypt,
+        isPgpgMessage: isPgpgMessage(this.body),
+        keyRing: this.mailvelope.keyRing,
+      });
+      this.mailvelope.keyRing = await mailvelope.getKeyring();
+      await this.checkRecipientsKeys();
+    },
+    onNewToAddr(addr) {
+      this.onNewAddr(addr, this.selectTo);
+    },
+    onNewCcAddr(addr) {
+      this.onNewAddr(addr, this.selectCc);
+    },
+    onNewBccAddr(addr) {
+      this.onNewAddr(addr, this.selectBcc);
+    },
+    onNewAddr(addr, list) {
+      const res = {
+        label: addr, // TODO: parse if possible
+        email: addr, // TODO: parse if possible
+      };
+      this.newRecipients.push(res);
+      list.push(res);
+      this.callSaveDraft(true, this.getMessageData);
+    },
+    async onSend(_, force = false) {
+      if (this.encrypt) {
+        logger.debug("get encrypted message from mailvelope");
+        await this.$refs.mailvelopeEditor.pull();
+      }
 
-			this.state = STATES.UPLOADING
+      this.state = STATES.UPLOADING;
 
-			await this.attachmentsPromise
-				.then(() => (this.state = STATES.SENDING))
-				.then(() => this.draftsPromise)
-				.then(this.getMessageData)
-				.then((data) => this.send({ ...data, force }))
-				.then(() => logger.info('message sent'))
-				.then(() => (this.state = STATES.FINISHED))
-				.catch(async(error) => {
-					logger.error('could not send message', { error });
-					[this.errorText, this.state] = await matchError(error, {
-						[NoSentMailboxConfiguredError.getName()]() {
-							return [t('mail', 'No sent mailbox configured. Please pick one in the account settings.'), STATES.ERROR]
-						},
-						[ManyRecipientsError.getName()]() {
-							return [t('mail', 'You are trying to send to many recipients in To and/or Cc. Consider using Bcc to hide recipient addresses.'), STATES.WARNING]
-						},
-						default(error) {
-							if (error && error.toString) {
-								return [error.toString(), STATES.ERROR]
-							}
-						},
-					})
-				})
+      await this.attachmentsPromise
+        .then(() => (this.state = STATES.SENDING))
+        .then(() => this.draftsPromise)
+        .then(this.getMessageData)
+        .then((data) => this.send({ ...data, force }))
+        .then(() => logger.info("message sent"))
+        .then(() => (this.state = STATES.FINISHED))
+        .catch(async (error) => {
+          logger.error("could not send message", { error });
+          [this.errorText, this.state] = await matchError(error, {
+            [NoSentMailboxConfiguredError.getName()]() {
+              return [
+                t(
+                  "mail",
+                  "No sent mailbox configured. Please pick one in the account settings."
+                ),
+                STATES.ERROR,
+              ];
+            },
+            [ManyRecipientsError.getName()]() {
+              return [
+                t(
+                  "mail",
+                  "You are trying to send to many recipients in To and/or Cc. Consider using Bcc to hide recipient addresses."
+                ),
+                STATES.WARNING,
+              ];
+            },
+            default(error) {
+              if (error && error.toString) {
+                return [error.toString(), STATES.ERROR];
+              }
+            },
+          });
+        });
 
-			// Sync sent mailbox when it's currently open
-			const account = this.$store.getters.getAccount(this.selectedAlias.id)
-			if (parseInt(this.$route.params.mailboxId, 10) === account.sentMailboxId) {
-				setTimeout(() => {
-					this.$store.dispatch('syncEnvelopes', {
-						mailboxId: account.sentMailboxId,
-						query: '',
-						init: false,
-					})
-				}, 500)
-			}
-		},
-		async onForceSend() {
-			await this.onSend(null, true)
-		},
-		reset() {
-			this.draftsPromise = Promise.resolve() // "resets" draft uid as well
-			this.selectTo = []
-			this.selectCc = []
-			this.selectBcc = []
-			this.subjectVal = ''
-			this.bodyVal = '<p></p><p></p>'
-			this.attachments = []
-			this.errorText = undefined
-			this.state = STATES.EDITING
-			this.autocompleteRecipients = []
-			this.newRecipients = []
-			this.requestMdn = false
-			this.appendSignature = true
+      // Sync sent mailbox when it's currently open
+      const account = this.$store.getters.getAccount(this.selectedAlias.id);
+      if (
+        parseInt(this.$route.params.mailboxId, 10) === account.sentMailboxId
+      ) {
+        setTimeout(() => {
+          this.$store.dispatch("syncEnvelopes", {
+            mailboxId: account.sentMailboxId,
+            query: "",
+            init: false,
+          });
+        }, 500);
+      }
+    },
+    async onForceSend() {
+      await this.onSend(null, true);
+    },
+    reset() {
+      this.draftsPromise = Promise.resolve(); // "resets" draft uid as well
+      this.selectTo = [];
+      this.selectCc = [];
+      this.selectBcc = [];
+      this.subjectVal = "";
+      this.bodyVal = "<p></p><p></p>";
+      this.attachments = [];
+      this.errorText = undefined;
+      this.state = STATES.EDITING;
+      this.autocompleteRecipients = [];
+      this.newRecipients = [];
+      this.requestMdn = false;
+      this.appendSignature = true;
+      this.savingDraft = undefined;
+      this.sendAtVal = undefined;
 
-			this.setAlias()
-			this.initBody()
-			Vue.nextTick(() => {
-				// toLabel may not be on the DOM yet
-				// (because "Message sent" is shown)
-				// so we defer the focus call
-				this.$refs.toLabel.$el.focus()
-			})
-		},
-		/**
-		 * Format aliases for the Multiselect
-		 * @param {Object} alias the alias to format
-		 * @returns {string}
-		 */
-		formatAliases(alias) {
-			if (!alias.name) {
-				return alias.emailAddress
-			}
+      this.setAlias();
+      this.initBody();
+      Vue.nextTick(() => {
+        // toLabel may not be on the DOM yet
+        // (because "Message sent" is shown)
+        // so we defer the focus call
+        this.$refs.toLabel.$el.focus();
+      });
+    },
+    /**
+     * Format aliases for the Multiselect
+     * @param {Object} alias the alias to format
+     * @returns {string}
+     */
+    formatAliases(alias) {
+      if (!alias.name) {
+        return alias.emailAddress;
+      }
 
-			return `${alias.name} <${alias.emailAddress}>`
-		},
-	},
-}
+      return `${alias.name} <${alias.emailAddress}>`;
+    },
+    async discardDraft() {
+      const id = await this.draftsPromise;
+      this.$emit("discard-draft", id);
+    },
+    /**
+     * Whether the date is acceptable
+     *
+     * @param {Date} date The date to compare to
+     * @returns {boolean}
+     */
+    disabledDatetimepickerDate(date) {
+      const minimumDate = new Date();
+      // Make it one sec before midnight so it shows the next full day as available
+      minimumDate.setHours(0, 0, 0);
+      minimumDate.setSeconds(minimumDate.getSeconds() - 1);
+
+      return date.getTime() <= minimumDate;
+    },
+
+    /**
+     * Whether the time for date is acceptable
+     *
+     * @param {Date} date The date to compare to
+     * @returns {boolean}
+     */
+    disabledDatetimepickerTime(date) {
+      const now = new Date();
+      const minimumDate = new Date(now.getTime());
+      return date.getTime() <= minimumDate;
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
 .message-composer {
-	margin: 0;
-	z-index: 100;
+  margin: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
 }
 
 .composer-actions {
-	display: flex;
-	flex-direction: row;
-	align-items: flex-end;
-	justify-content: space-between;
-	position: sticky;
-	bottom: 0;
-	padding: 12px;
-	background: linear-gradient(rgba(255, 255, 255, 0), var(--color-main-background-translucent) 50%);
-}
-
-.composer-actions-right {
-	display: flex;
-	align-items: center;
+  position: sticky;
+  background: linear-gradient(
+    rgba(255, 255, 255, 0),
+    var(--color-main-background-translucent) 50%
+  );
 }
 
 .composer-fields {
-	display: flex;
-	align-items: center;
-	border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--color-border);
 
-	&.mail-account {
-		border-top: none;
+  &.mail-account {
+    border-top: none;
+    padding-top: 10px;
 
-		& > .multiselect {
-			max-width: none;
-			min-height: auto;
-		}
-	}
+    & > .multiselect {
+      max-width: none;
+      min-height: auto;
+    }
+  }
 
-	.multiselect,
-	input,
-	TextEditor {
-		flex-grow: 1;
-		max-width: none;
-		border: none;
-		border-radius: 0;
-	}
+  .multiselect,
+  input,
+  TextEditor {
+    flex-grow: 1;
+    max-width: none;
+    border: none;
+    border-radius: 0;
+  }
 
-	.multiselect {
-		margin-right: 12px;
-	}
+  .multiselect {
+    margin-right: 12px;
+  }
 }
 
 .subject {
-	font-size: 20px;
-	font-weight: bold;
-	margin: 0;
-	padding: 24px 12px;
+  font-size: 20px;
+  font-weight: bold;
+  margin: 0;
+  padding: 24px 20px;
 }
 
 .warning-box {
-	padding: 5px 12px;
-	border-radius: 0;
+  padding: 5px 12px;
+  border-radius: 0;
+}
+
+// Make composer editor expand
+.message-editor {
+  flex: 1 1 100%;
+  min-height: 0;
 }
 
 .message-body {
-	min-height: 300px;
-	width: 100%;
-	margin: 0;
-	padding: 12px;
-	border: none !important;
-	outline: none !important;
-	box-shadow: none !important;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  padding-left: 20px;
 }
 
-#draft-status {
-	padding: 5px;
-	opacity: 0.5;
-	font-size: small;
+.draft-status {
+  padding: 2px;
+  opacity: 0.5;
+  font-size: small;
+  display: block;
 }
 
 .from-label,
@@ -918,44 +1307,104 @@ export default {
 .copy-toggle,
 .cc-label,
 .bcc-label {
-	padding: 12px;
-	cursor: text;
-	color: var(--color-text-maxcontrast);
-	width: 100px;
-	text-align: right;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  padding-right: 20px;
+  cursor: text;
+  color: var(--color-text-maxcontrast);
+  width: 100px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bcc-label {
-	top: initial;
-	bottom: 0;
+  top: initial;
+  bottom: 0;
 }
 
 .copy-toggle {
-	cursor: pointer;
-	width: initial;
+  cursor: pointer;
+  width: initial;
 
-	&:hover,
-	&:focus {
-		color: var(--color-main-text);
-	}
+  &:hover,
+  &:focus {
+    color: var(--color-main-text);
+  }
 }
 
 .reply {
-	min-height: 100px;
+  min-height: 100px;
 }
 
-.send {
-	padding: 12px 18px 13px 36px;
-	background-position: 12px center;
-	margin-left: 4px;
-}
 ::v-deep .multiselect .multiselect__tags {
-	border: none !important;
+  border: none !important;
 }
-.submit-message.send.primary.icon-confirm-white {
-	color: var(--color-main-background);
+
+.sending-hint {
+  height: 50px;
+  margin-top: 50px;
+}
+.button {
+  background-color: transparent;
+  border: none;
+}
+.send-action-radio {
+  padding: 5px 0 5px 0;
+}
+.send-button {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  margin-left: 5px;
+}
+.send-button .send-icon {
+  padding-right: 5px;
+}
+.centered-content {
+  margin-top: 0 !important;
+}
+.composer-actions-right {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  justify-content: space-between;
+  bottom: 5px;
+}
+.composer-actions--primary-actions {
+  display: flex;
+  flex-direction: row;
+  padding-left: 10px;
+  align-items: center;
+}
+.composer-actions--secondary-actions {
+  display: flex;
+  flex-direction: row;
+  padding: 5px;
+}
+.composer-actions--primary-actions .button {
+  padding: 2px;
+}
+.composer-actions--secondary-actions .button {
+  flex-shrink: 0;
+}
+
+.composer-actions-draft-status {
+  padding-left: 10px;
+}
+
+@media only screen and (max-width: 580px) {
+  .composer-actions-right {
+    align-items: end;
+    flex-direction: column-reverse;
+  }
+  .composer-actions-draft-status {
+    text-align: end;
+    padding-right: 15px;
+  }
+  .composer-actions--primary-actions {
+    padding-right: 5px;
+  }
 }
 </style>
