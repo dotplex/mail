@@ -71,6 +71,36 @@ All notable changes to this project will be documented in this file.
 - Consider passwordless signings when provisioning
 
 ## 1.12.0 - 2022-05-03
+## 1.13.6 - 2022-06-29
+### Fixed
+- Editing draft
+- Image attachment viewer
+
+## 1.13.5 - 2022-06-22
+- Make sender to be centered with the avatar and timestamp
+- Restore ability to write mails in safari
+
+## 1.13.4 - 2022-06-13
+### Fixed
+- Better signature detection
+- Forwarding more than one attachment
+
+## 1.13.3 - 2022-06-08
+### Fixed
+- Editing of outbox messages
+
+## 1.13.2 - 2022-06-07
+### Fixed
+- Quoting forwarded messages
+- Sending erroneous message repeatedly
+- Database platform check with Nextcloud <22.2
+- Missing Composer.vue::initBody call after mount
+
+## 1.13.1 – 2022-06-07
+### Fixed
+- Upgrade error on Nextcloud <22.2
+- Missing reply flagging and headers for edited outbox messages
+
 ## 1.13.0 – 2022-06-02
 ### Added
 - PHP8.1 support

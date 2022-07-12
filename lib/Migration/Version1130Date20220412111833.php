@@ -119,7 +119,7 @@ class Version1130Date20220412111833 extends SimpleMigrationStep {
 		$schema = $schemaClosure();
 
 		// bigint and primary key with autoincrement is not possible on sqlite: https://github.com/nextcloud/server/commit/f57e334f8395e3b5c046b6d28480d798453e4866
-		$isSqlite = $schema->getDatabasePlatform() instanceof SqlitePlatform;
+		$isSqlite = $this->connection->getDatabasePlatform() instanceof SqlitePlatform;
 
 		// Remove old unnamed attachments FK
 		$attachmentsTable = $schema->getTable('mail_attachments');
@@ -170,7 +170,7 @@ class Version1130Date20220412111833 extends SimpleMigrationStep {
 		$messagesTable->addIndex(['mailbox_id'], 'mail_messages_mailbox_id');
 
 		// Postgres doesn't allow for shortened indices, so let's skip the last index.
-		if ($schema->getDatabasePlatform() instanceof PostgreSQL94Platform) {
+		if ($this->connection->getDatabasePlatform() instanceof PostgreSQL94Platform) {
 			return $schema;
 		}
 

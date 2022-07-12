@@ -183,7 +183,7 @@
 				:placeholder="t('mail', 'Write message …')"
 				:focus="isReply"
 				:bus="bus"
-				@input="callSaveDraft(true, getMessageData)" />
+				@input="onEditorInputText" />
 			<TextEditor
 				v-else-if="!encrypt && !editorPlainText"
 				key="editor-rich"
@@ -194,7 +194,7 @@
 				:placeholder="t('mail', 'Write message …')"
 				:focus="isReply"
 				:bus="bus"
-				@input="onEditorRichInputText" />
+				@input="onEditorInputText" />
 			<MailvelopeEditor
 				v-else
 				ref="mailvelopeEditor"
@@ -295,7 +295,6 @@
 							name="sendLater"
 							:checked="!sendAtVal"
 							class="send-action-radio"
-							@update:checked="sendAtVal = undefined"
 							@change="onChangeSendLater(undefined)">
 							{{ t('mail', 'Send now') }}
 						</ActionRadio>
@@ -303,7 +302,6 @@
 							name="sendLater"
 							:checked="isSendAtTomorrowMorning"
 							class="send-action-radio send-action-radio--multiline"
-							@update:checked="sendAtVal = dateTomorrowMorning"
 							@change="onChangeSendLater(dateTomorrowMorning)">
 							{{ t('mail', 'Tomorrow morning') }} - {{ convertToLocalDate(dateTomorrowMorning) }}
 						</ActionRadio>
@@ -311,7 +309,6 @@
 							name="sendLater"
 							:checked="isSendAtTomorrowAfternoon"
 							class="send-action-radio send-action-radio--multiline"
-							@update:checked="sendAtVal = dateTomorrowAfternoon"
 							@change="onChangeSendLater(dateTomorrowAfternoon)">
 							{{ t('mail', 'Tomorrow afternoon') }} - {{ convertToLocalDate(dateTomorrowAfternoon) }}
 						</ActionRadio>
@@ -319,7 +316,6 @@
 							name="sendLater"
 							:checked="isSendAtMondayMorning"
 							class="send-action-radio send-action-radio--multiline"
-							@update:checked="sendAtVal = dateMondayMorning"
 							@change="onChangeSendLater(dateMondayMorning)">
 							{{ t('mail', 'Monday morning') }} - {{ convertToLocalDate(dateMondayMorning) }}
 						</ActionRadio>
@@ -327,7 +323,6 @@
 							class="send-action-radio"
 							:checked="isSendAtCustom"
 							:value="customSendTime"
-							@update:checked="sendAtVal = customSendTime"
 							@change="onChangeSendLater(customSendTime)">
 							{{ t('mail', 'Custom date and time') }}
 						</ActionRadio>
@@ -510,6 +505,10 @@ export default {
 			type: Object,
 			default: () => html(''),
 		},
+		editorBody: {
+			type: String,
+			default: '',
+		},
 		draftId: {
 			type: Number,
 			default: undefined,
@@ -521,6 +520,10 @@ export default {
 		send: {
 			type: Function,
 			required: true,
+		},
+		inReplyToMessageId: {
+			type: String,
+			default: undefined,
 		},
 		replyTo: {
 			type: Object,
@@ -547,7 +550,7 @@ export default {
 		},
 	},
 	data() {
-		let bodyVal = toHtml(this.body).value
+		let bodyVal = this.editorBody
 		if (bodyVal.length === 0) {
 			// an empty body (e.g "") does not trigger an onInput event.
 			// but to append the signature a onInput event is required.
@@ -606,7 +609,7 @@ export default {
 				},
 			},
 			autoLimit: true,
-			editorRichInputTextReady: false,
+			editorInputTextReady: false,
 		}
 	},
 	computed: {
@@ -705,22 +708,32 @@ export default {
 			return timeFormat.indexOf('a') !== -1
 		},
 		isSendAtTomorrowMorning() {
-			return this.sendAtVal
-				&& Math.floor(this.dateTomorrowMorning / 1000) === Math.floor(this.sendAtVal / 1000)
+			if (this.sendAtVal && Math.floor(this.dateTomorrowMorning / 1000) === Math.floor(this.sendAtVal / 1000)) {
+				return true
+			} else {
+				return false
+			}
 		},
 		isSendAtTomorrowAfternoon() {
-			return this.sendAtVal
-				&& Math.floor(this.dateTomorrowAfternoon / 1000) === Math.floor(this.sendAtVal / 1000)
+			if (this.sendAtVal && Math.floor(this.dateTomorrowAfternoon / 1000) === Math.floor(this.sendAtVal / 1000)) {
+				return true
+			} else {
+				return false
+			}
 		},
 		isSendAtMondayMorning() {
-			return this.sendAtVal
-				&& Math.floor(this.dateMondayMorning / 1000) === Math.floor(this.sendAtVal / 1000)
+			if (this.sendAtVal && Math.floor(this.dateMondayMorning / 1000) === Math.floor(this.sendAtVal / 1000)) {
+				return true
+			} else {
+				return false
+			}
 		},
 		isSendAtCustom() {
-			return this.sendAtVal
-				&& !this.isSendAtTomorrowMorning
-				&& !this.isSendAtTomorrowAfternoon
-				&& !this.isSendAtMondayMorning
+			if (this.sendAtVal && !this.isSendAtTomorrowMorning && !this.isSendAtTomorrowAfternoon && !this.isSendAtMondayMorning) {
+				return true
+			} else {
+				return false
+			}
 		},
 	},
 	watch: {
@@ -745,9 +758,19 @@ export default {
 				this.onAliasChange(newAlias)
 			}
 		},
+		editorMode() {
+			this.appendSignature = true
+		},
+		bodyVal() {
+			if (this.body.value === '') {
+				this.appendSignature = true
+			}
+			this.handleAppendSignature()
+		},
 	},
 	async beforeMount() {
 		this.setAlias()
+		this.initBody()
 		await this.onMailvelopeLoaded(await getMailvelope())
 	},
 	mounted() {
@@ -857,7 +880,7 @@ export default {
 				subject: this.subjectVal,
 				body: this.encrypt ? plain(this.bodyVal) : html(this.bodyVal),
 				attachments: this.attachments,
-				inReplyToMessageId: this.replyTo ? this.replyTo.messageId : undefined,
+				inReplyToMessageId: this.inReplyToMessageId ?? (this.replyTo ? this.replyTo.messageId : undefined),
 				isHtml: !this.editorPlainText,
 				requestMdn: this.requestMdn,
 				sendAt: this.sendAtVal ? Math.floor(this.sendAtVal / 1000) : undefined,
@@ -919,8 +942,7 @@ export default {
 		onSave() {
 			this.callSaveDraft(false, this.getMessageData)
 		},
-		onInputChanged() {
-			this.callSaveDraft(true, this.getMessageData)
+		handleAppendSignature() {
 			if (this.appendSignature) {
 				const signatureValue = toHtml(detect(this.selectedAlias.signature)).value
 				this.bus.$emit('insertSignature', signatureValue, this.selectedAlias.signatureAboveQuote)
@@ -930,11 +952,11 @@ export default {
 		// needs to bypass an input event of the first initialisation, because of:
 		// an empty body (e.g "") does not trigger an onInput event.
 		// but to append the signature a onInput event is required.
-		onEditorRichInputText() {
-			if (this.editorRichInputTextReady) {
+		onEditorInputText() {
+			if (this.editorInputTextReady) {
 				this.callSaveDraft(true, this.getMessageData)
 			}
-			this.editorRichInputTextReady = true
+			this.editorInputTextReady = true
 		},
 		onChangeSendLater(value) {
 			this.sendAtVal = value ? Number.parseInt(value, 10) : undefined
@@ -952,7 +974,7 @@ export default {
 			logger.debug('changed alias', { alias })
 			this.selectedAlias = alias
 			this.appendSignature = true
-			this.onInputChanged()
+			this.handleAppendSignature()
 		},
 		onAddLocalAttachment() {
 			this.bus.$emit('onAddLocalAttachment')
@@ -1280,6 +1302,11 @@ export default {
 	padding-top: 12px;
 	padding-bottom: 12px;
 	padding-left: 20px;
+
+	// Fix contenteditable not becoming focused upon clichint within it's
+	// boundaries in safari
+	-webkit-user-select: text;
+	user-select: text;
 }
 
 .draft-status {

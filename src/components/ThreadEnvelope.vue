@@ -51,7 +51,7 @@
 				class="left"
 				:class="{seen: envelope.flags.seen}"
 				@click.native.prevent="$emit('toggleExpand', $event)">
-				<div class="sender">
+				<div class="sender" :class="{ 'centered-sender': centeredSender }">
 					{{ envelope.from && envelope.from[0] ? `${envelope.from[0].label} <${envelope.from[0].email}>` : '' }}
 				</div>
 				<div v-if="hasChangedSubject" class="subject">
@@ -206,6 +206,9 @@ export default {
 		cleanSubject() {
 			return this.envelope.subject.replace(/((?:[\t ]*(?:R|RE|F|FW|FWD):[\t ]*)*)/i, '')
 		},
+		centeredSender() {
+			  return (!this.hasChangedSubject || this.cleanSubject.length === 0) && this.tags.length === 0
+		},
 	},
 	watch: {
 		expanded(expanded) {
@@ -309,6 +312,9 @@ export default {
 	.sender,
 	.recipients {
 		margin-left: 8px;
+	}
+	.centered-sender {
+		margin-top: 8px;
 	}
 
 	.recipients {
@@ -486,4 +492,5 @@ export default {
 	.envelope--header.list-item-style {
 		border-radius: 0;
 	}
+
 </style>

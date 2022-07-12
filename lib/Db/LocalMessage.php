@@ -42,9 +42,13 @@ use function array_filter;
  * @method string getSubject()
  * @method void setSubject(string $subject)
  * @method string getBody()
- * @method void setBody(string $body)
+ * @method void setBody(?string $body)
+ * @method string|null getEditorBody()
+ * @method void setEditorBody(string $body)
  * @method bool isHtml()
  * @method void setHtml(bool $html)
+ * @method bool|null isFailed()
+ * @method void setFailed(bool $failed)
  * @method string|null getInReplyToMessageId()
  * @method void setInReplyToMessageId(?string $inReplyToId)
  */
@@ -73,6 +77,9 @@ class LocalMessage extends Entity implements JsonSerializable {
 	/** @var string */
 	protected $body;
 
+	/** @var string|null */
+	protected $editorBody;
+
 	/** @var bool */
 	protected $html;
 
@@ -85,12 +92,16 @@ class LocalMessage extends Entity implements JsonSerializable {
 	/** @var array|null */
 	protected $recipients;
 
+	/** @var bool|null */
+	protected $failed;
+
 	public function __construct() {
 		$this->addType('type', 'integer');
 		$this->addType('accountId', 'integer');
 		$this->addType('aliasId', 'integer');
 		$this->addType('sendAt', 'integer');
 		$this->addType('html', 'boolean');
+		$this->addType('failed', 'boolean');
 	}
 
 	#[ReturnTypeWillChange]
@@ -103,6 +114,7 @@ class LocalMessage extends Entity implements JsonSerializable {
 			'sendAt' => $this->getSendAt(),
 			'subject' => $this->getSubject(),
 			'body' => $this->getBody(),
+			'editorBody' => $this->getEditorBody(),
 			'isHtml' => ($this->isHtml() === true),
 			'inReplyToMessageId' => $this->getInReplyToMessageId(),
 			'attachments' => $this->getAttachments(),
@@ -126,6 +138,7 @@ class LocalMessage extends Entity implements JsonSerializable {
 					return $recipient->getType() === Recipient::TYPE_BCC;
 				})
 			),
+			'failed' => $this->isFailed() === true,
 		];
 	}
 
