@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "37b96159064d686c39e6a4366d0e25e7",
+    "content-hash": "b05a84cbd22e3f0b7648ebf0be1fac8b",
     "packages": [
         {
             "name": "amphp/amp",
@@ -39,13 +39,13 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "Amp\\": "lib"
-                },
                 "files": [
                     "lib/functions.php",
                     "lib/Internal/functions.php"
-                ]
+                ],
+                "psr-4": {
+                    "Amp\\": "lib"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -123,12 +123,12 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "Amp\\ByteStream\\": "lib"
-                },
                 "files": [
                     "lib/functions.php"
-                ]
+                ],
+                "psr-4": {
+                    "Amp\\ByteStream\\": "lib"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -192,14 +192,14 @@
             },
             "type": "library",
             "autoload": {
-                "psr-4": {
-                    "Amp\\Parallel\\": "lib"
-                },
                 "files": [
                     "lib/Context/functions.php",
                     "lib/Sync/functions.php",
                     "lib/Worker/functions.php"
-                ]
+                ],
+                "psr-4": {
+                    "Amp\\Parallel\\": "lib"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -303,12 +303,12 @@
             },
             "type": "library",
             "autoload": {
-                "psr-4": {
-                    "Amp\\Process\\": "lib"
-                },
                 "files": [
                     "lib/functions.php"
-                ]
+                ],
+                "psr-4": {
+                    "Amp\\Process\\": "lib"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -361,12 +361,12 @@
             },
             "type": "library",
             "autoload": {
-                "psr-4": {
-                    "Amp\\Serialization\\": "src"
-                },
                 "files": [
                     "src/functions.php"
-                ]
+                ],
+                "psr-4": {
+                    "Amp\\Serialization\\": "src"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -417,13 +417,13 @@
             },
             "type": "library",
             "autoload": {
-                "psr-4": {
-                    "Amp\\Sync\\": "src"
-                },
                 "files": [
                     "src/functions.php",
                     "src/ConcurrentIterator/functions.php"
-                ]
+                ],
+                "psr-4": {
+                    "Amp\\Sync\\": "src"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -767,12 +767,12 @@
             },
             "type": "library",
             "autoload": {
-                "psr-0": {
-                    "HTMLPurifier": "library/"
-                },
                 "files": [
                     "library/HTMLPurifier.composer.php"
                 ],
+                "psr-0": {
+                    "HTMLPurifier": "library/"
+                },
                 "exclude-from-classmap": [
                     "/library/HTMLPurifier/Language/"
                 ]
@@ -1193,7 +1193,7 @@
             "license": [
                 "BSD-2-Clause"
             ],
-            "description": "Provides interfaces for sending e-mail messages and parsing e-mail addresses."
+            "description": "A library that provides interfaces for sending e-mail messages and parsing e-mail addresses."
         },
         {
             "name": "pear-pear.horde.org/Horde_ManageSieve",
@@ -1435,7 +1435,7 @@
             "license": [
                 "LGPL-2.1"
             ],
-            "description": "A collection of various stream filters."
+            "description": "A library of various stream filters."
         },
         {
             "name": "pear-pear.horde.org/Horde_Stream_Wrapper",
@@ -1462,7 +1462,7 @@
             "license": [
                 "BSD-2-Clause"
             ],
-            "description": "A collection of stream wrappers."
+            "description": "A library of stream wrappers."
         },
         {
             "name": "pear-pear.horde.org/Horde_Stringprep",
@@ -1521,7 +1521,7 @@
             "license": [
                 "BSD-2-Clause"
             ],
-            "description": "Support classes not tied to Horde but is used by it. These classes can be used outside of Horde as well."
+            "description": "Support library not tied to Horde but used by it."
         },
         {
             "name": "pear-pear.horde.org/Horde_Text_Filter",
@@ -1729,13 +1729,13 @@
             },
             "type": "library",
             "autoload": {
-                "psr-4": {
-                    "Rubix\\ML\\": "src/"
-                },
                 "files": [
                     "src/constants.php",
                     "src/functions.php"
-                ]
+                ],
+                "psr-4": {
+                    "Rubix\\ML\\": "src/"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -1870,14 +1870,14 @@
             },
             "type": "library",
             "autoload": {
-                "psr-4": {
-                    "Tensor\\": "src/",
-                    "JAMA\\": "lib/JAMA",
-                    "Zephir\\Optimizers\\FunctionCall\\": "optimizers/"
-                },
                 "files": [
                     "src/constants.php"
-                ]
+                ],
+                "psr-4": {
+                    "JAMA\\": "lib/JAMA",
+                    "Tensor\\": "src/",
+                    "Zephir\\Optimizers\\FunctionCall\\": "optimizers/"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -1974,12 +1974,12 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "Symfony\\Polyfill\\Mbstring\\": ""
-                },
                 "files": [
                     "bootstrap.php"
-                ]
+                ],
+                "psr-4": {
+                    "Symfony\\Polyfill\\Mbstring\\": ""
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -2048,12 +2048,12 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "Symfony\\Polyfill\\Php73\\": ""
-                },
                 "files": [
                     "bootstrap.php"
                 ],
+                "psr-4": {
+                    "Symfony\\Polyfill\\Php73\\": ""
+                },
                 "classmap": [
                     "Resources/stubs"
                 ]
@@ -2124,12 +2124,12 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "Symfony\\Polyfill\\Php80\\": ""
-                },
                 "files": [
                     "bootstrap.php"
                 ],
+                "psr-4": {
+                    "Symfony\\Polyfill\\Php80\\": ""
+                },
                 "classmap": [
                     "Resources/stubs"
                 ]
@@ -2257,20 +2257,21 @@
                 }
             ],
             "description": "Composer package containing Nextcloud's public API (classes, interfaces)",
+            "abandoned": "nextcloud/ocp",
             "time": "2021-02-03T07:58:35+00:00"
         },
         {
             "name": "psalm/phar",
-            "version": "4.7.1",
+            "version": "5.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/psalm/phar.git",
-                "reference": "9e96a91f1bca15fa89ddce177872f440d62940b7"
+                "reference": "43a6cee76d19e9ddc2e39ef1f0ae7d12d351c85f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/psalm/phar/zipball/9e96a91f1bca15fa89ddce177872f440d62940b7",
-                "reference": "9e96a91f1bca15fa89ddce177872f440d62940b7",
+                "url": "https://api.github.com/repos/psalm/phar/zipball/43a6cee76d19e9ddc2e39ef1f0ae7d12d351c85f",
+                "reference": "43a6cee76d19e9ddc2e39ef1f0ae7d12d351c85f",
                 "shasum": ""
             },
             "require": {
@@ -2288,7 +2289,7 @@
                 "MIT"
             ],
             "description": "Composer-based Psalm Phar",
-            "time": "2021-04-25T21:29:13+00:00"
+            "time": "2022-12-02T21:23:59+00:00"
         },
         {
             "name": "roave/security-advisories",
