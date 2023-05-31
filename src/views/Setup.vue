@@ -76,6 +76,16 @@ export default {
     overflow-y: scroll;
     height: 90vh;
 }
+#emptycontent:before {
+    position: absolute;
+    content: '';
+    background: #fff;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: -100;
+}
 ::v-deep .content.app-mail {
 	background: #fff;
 }
