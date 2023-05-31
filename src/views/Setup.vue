@@ -71,6 +71,9 @@ export default {
 
 <style>
 #emptycontent {
-	margin-top: 10vh;
+	padding-top: 10vh;
+    margin-top: 0;
+    overflow-y: scroll;
+    height: 90vh;
 }
 </style>

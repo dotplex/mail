@@ -413,4 +413,9 @@ input[type='radio'][disabled] + label {
 	cursor: default;
 	opacity: 0.5;
 }
+
+#account-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
 </style>
