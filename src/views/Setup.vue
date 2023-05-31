@@ -82,7 +82,7 @@ export default {
     background: #fff;
     left: 0;
     right: 0;
-    top: 0;
+    top: 50px;
     bottom: 0;
     z-index: -100;
 }
