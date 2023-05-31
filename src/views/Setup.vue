@@ -76,4 +76,7 @@ export default {
     overflow-y: scroll;
     height: 90vh;
 }
+::v-deep .content.app-mail {
+	background: #fff;
+}
 </style>
